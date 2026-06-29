@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PostCategory {
+  TALK
+  WORRY
+  TIPS
+  PARENTING
+  TOGETHER
+  LETTERS
+}
+
+enum ReactionType {
+  ME_TOO
+  HUG
+  SAVED
+  HELPFUL
+}
+
+enum CommentTone {
+  SUPPORT
+  ADVICE
+  QUESTION
+}
+
+enum LetterTone {
+  THANKS
+  SORRY
+  HURT
+}
+
+enum FeedbackStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  HIDDEN
+}
+
+model User {
+  id                String              @id @default(cuid())
+  name              String?
+  email             String?             @unique
+  emailVerified     DateTime?
+  image             String?
+  nickname          String?
+  coupleStage       String?
+  role              String              @default("MEMBER")
+  accounts          Account[]
+  sessions          Session[]
+  posts             Post[]
+  comments          Comment[]
+  reactions         Reaction[]
+  temperatureChecks TemperatureCheck[]
+  missionCompletions MissionCompletion[]
+  letters           AnonymousLetter[]
+  badges            UserBadge[]
+  feedback          Feedback[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Post {
+  id          String        @id @default(cuid())
+  category    PostCategory
+  title       String
+  body        String
+  authorId    String?
+  authorName  String        @default("익명의 부부")
+  coupleStage String?
+  mood        String?
+  temperature Int?
+  readMinutes Int           @default(1)
+  isPinned    Boolean       @default(false)
+  isAnonymous Boolean       @default(false)
+  tags        String[]      @default([])
+  author      User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  comments    Comment[]
+  reactions   Reaction[]
+  feedback    Feedback[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([category, createdAt])
+}
+
+model Comment {
+  id        String      @id @default(cuid())
+  postId    String
+  authorId  String?
+  authorName String     @default("방문자")
+  body      String
+  tone      CommentTone @default(SUPPORT)
+  post      Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([postId, createdAt])
+}
+
+model Reaction {
+  id        String       @id @default(cuid())
+  type      ReactionType
+  postId    String
+  userId    String?
+  anonKey   String?
+  post      Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@unique([postId, type, userId])
+  @@index([postId, type])
+}
+
+model TemperatureCheck {
+  id        String   @id @default(cuid())
+  userId    String?
+  anonKey   String?
+  score     Int
+  note      String?
+  checkedAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([checkedAt])
+}
+
+model Mission {
+  id          String              @id @default(cuid())
+  title       String
+  prompt      String
+  difficulty  String
+  isActive    Boolean             @default(true)
+  completions MissionCompletion[]
+  createdAt   DateTime            @default(now())
+}
+
+model MissionCompletion {
+  id          String   @id @default(cuid())
+  missionId   String
+  userId      String?
+  anonKey     String?
+  reflection  String?
+  mission     Mission  @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+
+  @@index([missionId, completedAt])
+}
+
+model AnonymousLetter {
+  id        String     @id @default(cuid())
+  title     String
+  body      String
+  tone      LetterTone
+  authorId  String?
+  author    User?      @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  replies   LetterReply[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model LetterReply {
+  id        String          @id @default(cuid())
+  letterId  String
+  body      String
+  authorName String         @default("익명의 응원")
+  letter    AnonymousLetter @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+}
+
+model Badge {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  title       String
+  description String
+  users       UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt  DateTime @default(now())
+
+  @@unique([userId, badgeId])
+}
+
+model Feedback {
+  id        String         @id @default(cuid())
+  postId    String?
+  userId    String?
+  kind      String
+  body      String
+  status    FeedbackStatus @default(OPEN)
+  post      Post?          @relation(fields: [postId], references: [id], onDelete: SetNull)
+  user      User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model AiOperationEntry {
+  id          String         @id @default(cuid())
+  title       String
+  source      String
+  summary     String
+  decision    String
+  publicNotes String[]       @default([])
+  status      FeedbackStatus @default(OPEN)
+  happenedAt  DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([happenedAt])
+  @@index([source, status])
+}
