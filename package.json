@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "legacy:import:13739": "tsx scripts/import-legacy-13739.ts legacy-13739.json"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
