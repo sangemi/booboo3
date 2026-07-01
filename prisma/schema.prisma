@@ -43,26 +43,26 @@ enum FeedbackStatus {
 }
 
 model User {
-  id                String              @id @default(cuid())
-  name              String?
-  email             String?             @unique
-  emailVerified     DateTime?
-  image             String?
-  nickname          String?
-  coupleStage       String?
-  role              String              @default("MEMBER")
-  accounts          Account[]
-  sessions          Session[]
-  posts             Post[]
-  comments          Comment[]
-  reactions         Reaction[]
-  temperatureChecks TemperatureCheck[]
+  id                 String              @id @default(cuid())
+  name               String?
+  email              String?             @unique
+  emailVerified      DateTime?
+  image              String?
+  nickname           String?
+  coupleStage        String?
+  role               String              @default("MEMBER")
+  accounts           Account[]
+  sessions           Session[]
+  posts              Post[]
+  comments           Comment[]
+  reactions          Reaction[]
+  temperatureChecks  TemperatureCheck[]
   missionCompletions MissionCompletion[]
-  letters           AnonymousLetter[]
-  badges            UserBadge[]
-  feedback          Feedback[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  letters            AnonymousLetter[]
+  badges             UserBadge[]
+  feedback           Feedback[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 model Account {
@@ -77,7 +77,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([provider, providerAccountId])
 }
@@ -98,42 +98,74 @@ model VerificationToken {
 }
 
 model Post {
-  id          String        @id @default(cuid())
-  category    PostCategory
-  title       String
-  body        String
-  authorId    String?
-  authorName  String        @default("익명의 부부")
-  coupleStage String?
-  mood        String?
-  temperature Int?
-  readMinutes Int           @default(1)
-  isPinned    Boolean       @default(false)
-  isAnonymous Boolean       @default(false)
-  tags        String[]      @default([])
-  author      User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  comments    Comment[]
-  reactions   Reaction[]
-  feedback    Feedback[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                 String       @id @default(cuid())
+  category           PostCategory
+  title              String
+  body               String
+  authorId           String?
+  authorName         String       @default("익명의 부부")
+  coupleStage        String?
+  mood               String?
+  temperature        Int?
+  readMinutes        Int          @default(1)
+  isPinned           Boolean      @default(false)
+  isAnonymous        Boolean      @default(false)
+  tags               String[]     @default([])
+  /// Legacy compatibility for booboo2 URLs and migrated posts.
+  /// TODO(legacy): Remove after 2027-06 if old /talk/post/:id traffic is no longer needed.
+  legacyId           Int?         @unique
+  /// Legacy compatibility for booboo2 URLs and migrated posts.
+  /// TODO(legacy): Remove after 2027-06 if old /talk/post/:id traffic is no longer needed.
+  legacyPath         String?      @unique
+  /// Legacy compatibility for source auditing during the booboo2 -> booboo3 migration.
+  /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
+  legacySource       String?
+  /// Legacy compatibility for migrated booboo2 public counters.
+  /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
+  legacyViewCount    Int?
+  /// Legacy compatibility for migrated booboo2 public counters.
+  /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
+  legacyLikeCount    Int?
+  /// Legacy compatibility for migrated booboo2 public counters.
+  /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
+  legacyDislikeCount Int?
+  /// Legacy compatibility for preserving the original booboo2 publication time.
+  /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
+  legacyCreatedAt    DateTime?
+  author             User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  comments           Comment[]
+  reactions          Reaction[]
+  feedback           Feedback[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   @@index([category, createdAt])
+  @@index([legacyId])
 }
 
 model Comment {
-  id        String      @id @default(cuid())
-  postId    String
-  authorId  String?
-  authorName String     @default("방문자")
-  body      String
-  tone      CommentTone @default(SUPPORT)
-  post      Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  postId          String
+  authorId        String?
+  authorName      String      @default("방문자")
+  body            String
+  tone            CommentTone @default(SUPPORT)
+  /// Legacy compatibility for migrated booboo2 comments.
+  /// TODO(legacy): Remove after 2027-06 if old comment audit data is no longer needed.
+  legacyId        Int?        @unique
+  /// Legacy compatibility for source auditing during the booboo2 -> booboo3 migration.
+  /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
+  legacySource    String?
+  /// Legacy compatibility for preserving the original booboo2 comment time.
+  /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
+  legacyCreatedAt DateTime?
+  post            Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author          User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@index([postId, createdAt])
+  @@index([legacyId])
 }
 
 model Reaction {
@@ -186,24 +218,24 @@ model MissionCompletion {
 }
 
 model AnonymousLetter {
-  id        String     @id @default(cuid())
+  id        String        @id @default(cuid())
   title     String
   body      String
   tone      LetterTone
   authorId  String?
-  author    User?      @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  author    User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
   replies   LetterReply[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model LetterReply {
-  id        String          @id @default(cuid())
-  letterId  String
-  body      String
-  authorName String         @default("익명의 응원")
-  letter    AnonymousLetter @relation(fields: [letterId], references: [id], onDelete: Cascade)
-  createdAt DateTime        @default(now())
+  id         String          @id @default(cuid())
+  letterId   String
+  body       String
+  authorName String          @default("익명의 응원")
+  letter     AnonymousLetter @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  createdAt  DateTime        @default(now())
 }
 
 model Badge {
@@ -215,12 +247,12 @@ model Badge {
 }
 
 model UserBadge {
-  id        String   @id @default(cuid())
-  userId    String
-  badgeId   String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
-  earnedAt  DateTime @default(now())
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt DateTime @default(now())
 
   @@unique([userId, badgeId])
 }
