@@ -21,6 +21,7 @@ import type {
   ReactionState,
   VerdictState,
 } from "@/lib/community-data";
+import { dailyMissionSelection, missions } from "@/lib/community-data";
 import { prisma } from "@/lib/db";
 
 type AuthorSummary = {
@@ -360,16 +361,100 @@ export async function createCommunityVerdictVote(input: {
 
 export async function completeCommunityMission(input: {
   missionId: string;
-  reflection?: string;
-  anonKey?: string;
+  userId: string;
 }) {
-  return prisma.missionCompletion.create({
+  const { missionDate, mission } = dailyMissionSelection();
+  const missionId = mission.id;
+  if (input.missionId !== missionId) return null;
+
+  await prisma.missionCompletion.upsert({
+    where: {
+      missionId_userId_completedOn: {
+        missionId,
+        userId: input.userId,
+        completedOn: missionDate,
+      },
+    },
+    create: {
+      missionId,
+      userId: input.userId,
+      completedOn: missionDate,
+    },
+    update: {},
+  });
+
+  return getTodayCommunityMission(input.userId);
+}
+
+export async function createCommunityMissionReflection(input: {
+  missionId: string;
+  userId: string;
+  body: string;
+}) {
+  const { missionDate, mission } = dailyMissionSelection();
+  const missionId = mission.id;
+  if (input.missionId !== missionId) return null;
+
+  await prisma.missionReflection.create({
     data: {
-      missionId: input.missionId,
-      reflection: input.reflection,
-      anonKey: input.anonKey,
+      missionId,
+      userId: input.userId,
+      body: input.body,
+      missionDate,
     },
   });
+
+  return getTodayCommunityMission(input.userId);
+}
+
+export async function getTodayCommunityMission(userId?: string) {
+  const { missionDate, mission: selectedMission } = dailyMissionSelection();
+  const missionId = selectedMission.id;
+  const [mission, completions, ownCompletion, reflections] = await Promise.all([
+    prisma.mission.findUnique({ where: { id: missionId } }),
+    prisma.missionCompletion.count({
+      where: { missionId, completedOn: missionDate },
+    }),
+    userId
+      ? prisma.missionCompletion.findUnique({
+          where: {
+            missionId_userId_completedOn: {
+              missionId,
+              userId,
+              completedOn: missionDate,
+            },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    prisma.missionReflection.findMany({
+      where: { missionId, missionDate },
+      orderBy: { createdAt: "asc" },
+      take: 50,
+      include: {
+        user: { select: { nickname: true, name: true } },
+      },
+    }),
+  ]);
+  const fallback = missions.find((item) => item.id === missionId) ?? selectedMission;
+
+  return {
+    id: mission?.id ?? fallback.id,
+    title: mission?.title ?? fallback.title,
+    prompt: mission?.prompt ?? fallback.prompt,
+    difficulty: (mission?.difficulty ?? fallback.difficulty) as
+      | "3분"
+      | "10분"
+      | "오늘 안에",
+    completions,
+    participated: Boolean(ownCompletion),
+    reflections: reflections.map((reflection) => ({
+      id: reflection.id,
+      author: reflection.user.nickname ?? reflection.user.name ?? "부부라이프 회원",
+      body: reflection.body,
+      createdAt: relativeTime(reflection.createdAt),
+    })),
+  };
 }
 
 export async function listAnonymousLetters(anonKey?: string): Promise<Letter[]> {

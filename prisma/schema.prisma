@@ -107,6 +107,7 @@ model User {
   verdictVotes       VerdictVote[]
   temperatureChecks  TemperatureCheck[]
   missionCompletions MissionCompletion[]
+  missionReflections MissionReflection[]
   letters            AnonymousLetter[]
   badges             UserBadge[]
   feedback           Feedback[]
@@ -309,6 +310,7 @@ model Mission {
   difficulty  String
   isActive    Boolean             @default(true)
   completions MissionCompletion[]
+  reflections MissionReflection[]
   createdAt   DateTime            @default(now())
 }
 
@@ -318,11 +320,27 @@ model MissionCompletion {
   userId      String?
   anonKey     String?
   reflection  String?
+  completedOn DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
   mission     Mission  @relation(fields: [missionId], references: [id], onDelete: Cascade)
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   completedAt DateTime @default(now())
 
+  @@unique([missionId, userId, completedOn])
   @@index([missionId, completedAt])
+}
+
+model MissionReflection {
+  id          String   @id @default(cuid())
+  missionId   String
+  userId      String
+  body        String
+  missionDate DateTime @db.Date
+  mission     Mission  @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([missionId, missionDate, createdAt])
+  @@index([userId, createdAt])
 }
 
 model AnonymousLetter {

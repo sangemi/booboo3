@@ -31,6 +31,10 @@ export const createMissionCompletionSchema = z.object({
   reflection: z.string().trim().max(800).optional(),
 });
 
+export const createMissionReflectionSchema = z.object({
+  body: z.string().trim().min(2).max(800),
+});
+
 export const createLetterSchema = z.object({
   body: z.string().trim().min(5).max(2000),
 });

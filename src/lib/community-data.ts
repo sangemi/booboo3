@@ -68,6 +68,15 @@ export type Mission = {
   prompt: string;
   difficulty: "3분" | "10분" | "오늘 안에";
   completions: number;
+  participated: boolean;
+  reflections: MissionReflection[];
+};
+
+export type MissionReflection = {
+  id: string;
+  author: string;
+  body: string;
+  createdAt: string;
 };
 
 export type Letter = {
@@ -124,23 +133,111 @@ export const missions: Mission[] = [
     title: "고마움 세 문장",
     prompt: "오늘 고마웠던 장면을 세 문장으로 말해보기",
     difficulty: "3분",
-    completions: 128,
+    completions: 0,
+    participated: false,
+    reflections: [],
   },
   {
     id: "m2",
-    title: "집안일 교대권",
-    prompt: "서로 제일 지친 일을 하나씩 바꿔 맡아보기",
+    title: "집안일 하나 바꾸기",
+    prompt: "서로 가장 지친 집안일을 오늘 한 번 바꿔 맡아보기",
     difficulty: "오늘 안에",
-    completions: 47,
+    completions: 0,
+    participated: false,
+    reflections: [],
   },
   {
     id: "m3",
     title: "휴대폰 없는 차 한 잔",
-    prompt: "알림을 끄고 10분 동안 오늘 하루만 묻기",
+    prompt: "알림을 끄고 10분 동안 오늘 하루만 물어보기",
     difficulty: "10분",
-    completions: 203,
+    completions: 0,
+    participated: false,
+    reflections: [],
+  },
+  {
+    id: "m4",
+    title: "먼저 안아주기",
+    prompt: "말보다 먼저 배우자를 10초 동안 안아주기",
+    difficulty: "3분",
+    completions: 0,
+    participated: false,
+    reflections: [],
+  },
+  {
+    id: "m5",
+    title: "추억 사진 한 장",
+    prompt: "함께 웃었던 사진 한 장을 골라 그날 이야기를 나누기",
+    difficulty: "10분",
+    completions: 0,
+    participated: false,
+    reflections: [],
+  },
+  {
+    id: "m6",
+    title: "오늘의 수고 묻기",
+    prompt: "오늘 가장 힘들었던 순간을 묻고 답을 끊지 않고 듣기",
+    difficulty: "10분",
+    completions: 0,
+    participated: false,
+    reflections: [],
+  },
+  {
+    id: "m7",
+    title: "둘만의 짧은 산책",
+    prompt: "집 근처를 10분만 함께 걸으며 해결책 없이 대화하기",
+    difficulty: "10분",
+    completions: 0,
+    participated: false,
+    reflections: [],
+  },
+  {
+    id: "m8",
+    title: "미뤄둔 사과 한마디",
+    prompt: "마음에 남아 있던 작은 일 하나를 변명 없이 사과하기",
+    difficulty: "오늘 안에",
+    completions: 0,
+    participated: false,
+    reflections: [],
+  },
+  {
+    id: "m9",
+    title: "배우자 편 하나 들기",
+    prompt: "오늘 한 번은 다른 사람 앞에서 배우자의 입장을 먼저 말해주기",
+    difficulty: "오늘 안에",
+    completions: 0,
+    participated: false,
+    reflections: [],
+  },
+  {
+    id: "m10",
+    title: "내일의 작은 약속",
+    prompt: "내일 서로를 위해 할 수 있는 작은 일 하나를 정하기",
+    difficulty: "3분",
+    completions: 0,
+    participated: false,
+    reflections: [],
   },
 ];
+
+export function dailyMissionSelection(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  const missionDate = new Date(Date.UTC(year, month - 1, day));
+  const dayNumber = Math.floor(missionDate.getTime() / 86_400_000);
+
+  return {
+    missionDate,
+    mission: missions[dayNumber % missions.length] ?? missions[0],
+  };
+}
 
 export const letters: Letter[] = [
   {

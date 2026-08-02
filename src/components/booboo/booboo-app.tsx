@@ -2,7 +2,6 @@
 
 import {
   Bookmark,
-  Check,
   ChevronLeft,
   ChevronRight,
   Flame,
@@ -27,10 +26,11 @@ import {
   categoryLabels,
   CategoryKey,
   CommunityPost,
+  dailyMissionSelection,
   emptyVerdicts,
   Letter,
   letters,
-  missions,
+  Mission,
   seedPosts,
   VerdictState,
 } from "@/lib/community-data";
@@ -56,7 +56,7 @@ type BoobooAppProps = {
 
 export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {}) {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [posts, setPosts] = useState<CommunityPost[]>(() =>
     initialPost
       ? [initialPost, ...seedPosts.filter((post) => post.id !== initialPost.id)]
@@ -66,7 +66,12 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     initialCategory ?? "all",
   );
   const [query, setQuery] = useState("");
-  const [completedMissions, setCompletedMissions] = useState<string[]>([]);
+  const [todayMission, setTodayMission] = useState<Mission>(
+    () => dailyMissionSelection().mission,
+  );
+  const [missionOpen, setMissionOpen] = useState(false);
+  const [missionReflectionDraft, setMissionReflectionDraft] = useState("");
+  const [pendingMissionAction, setPendingMissionAction] = useState(false);
   const [communityLetters, setCommunityLetters] = useState(letters);
   const [selectedPostId, setSelectedPostId] = useState(
     initialPost?.id ?? seedPosts[0]?.id ?? "",
@@ -129,8 +134,23 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
       }
     }
 
+    async function loadTodayMission() {
+      try {
+        const response = await fetch("/api/community/missions/today", {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as { mission?: Mission };
+        if (active && payload.mission) setTodayMission(payload.mission);
+      } catch {
+        return;
+      }
+    }
+
     loadPosts();
     loadLetters();
+    loadTodayMission();
 
     return () => {
       active = false;
@@ -196,6 +216,23 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     };
   }, [selectedLetterId]);
 
+  useEffect(() => {
+    if (!missionOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMissionOpen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [missionOpen]);
+
   function selectPost(post: CommunityPost) {
     setSelectedPostId(post.id);
     setMobileDetailOpen(true);
@@ -228,6 +265,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     postId: string,
     type: keyof CommunityPost["reactions"],
   ) {
+    if (sessionStatus === "loading") return;
     if (!session?.user) {
       const callbackUrl = `${window.location.pathname}${window.location.search}`;
       router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
@@ -413,18 +451,68 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     setCommentDrafts((current) => ({ ...current, [postId]: "" }));
   }
 
-  function completeMission(id: string) {
-    setCompletedMissions((current) =>
-      current.includes(id)
-        ? current.filter((missionId) => missionId !== id)
-        : [...current, id],
-    );
+  async function participateInMission() {
+    if (pendingMissionAction || todayMission.participated) return;
+    if (sessionStatus === "loading") return;
+    if (!session?.user) {
+      const callbackUrl = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      return;
+    }
 
-    fetch(`/api/community/missions/${id}/complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    }).catch(() => undefined);
+    setPendingMissionAction(true);
+    try {
+      const response = await fetch(
+        `/api/community/missions/${todayMission.id}/complete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as { mission?: Mission };
+      if (payload.mission) setTodayMission(payload.mission);
+    } catch {
+      return;
+    } finally {
+      setPendingMissionAction(false);
+    }
+  }
+
+  async function submitMissionReflection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const body = missionReflectionDraft.trim();
+    if (!body || pendingMissionAction) return;
+    if (sessionStatus === "loading") return;
+    if (!session?.user) {
+      const callbackUrl = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      return;
+    }
+
+    setPendingMissionAction(true);
+    try {
+      const response = await fetch(
+        `/api/community/missions/${todayMission.id}/reflections`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body }),
+        },
+      );
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as { mission?: Mission };
+      if (!payload.mission) return;
+      setTodayMission(payload.mission);
+      setMissionReflectionDraft("");
+    } catch {
+      return;
+    } finally {
+      setPendingMissionAction(false);
+    }
   }
 
   async function submitLetter() {
@@ -802,46 +890,20 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
               <h2 className="text-sm font-extrabold">오늘의 부부 미션</h2>
               <Flame className="size-4 text-[var(--coral)]" />
             </div>
-            <p className="mb-3 text-sm leading-6 text-[var(--ink-soft)]">
-              하루에 하나만 해도 집 분위기가 조금 달라지는 행동을 모읍니다.
-            </p>
-            <div className="space-y-3">
-              {missions.map((mission) => {
-                const completed = completedMissions.includes(mission.id);
-                return (
-                  <button
-                    key={mission.id}
-                    onClick={() => completeMission(mission.id)}
-                    className={cn(
-                      "w-full rounded-[8px] border p-3 text-left transition",
-                      completed
-                        ? "border-[var(--leaf)] bg-[#eef7f1]"
-                        : "border-[var(--line)] bg-white hover:border-[var(--leaf)]",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <strong className="text-sm">{mission.title}</strong>
-                      <span
-                        className={cn(
-                          "grid size-6 place-items-center rounded-full border",
-                          completed
-                            ? "border-[var(--leaf)] bg-[var(--leaf)] text-white"
-                            : "border-[var(--line)] text-transparent",
-                        )}
-                      >
-                        <Check className="size-3.5" />
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
-                      {mission.prompt}
-                    </p>
-                    <p className="mt-2 text-xs font-bold text-[var(--plum)]">
-                      {mission.difficulty} · {mission.completions}쌍 참여
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
+            <button
+              type="button"
+              aria-label={`오늘의 미션 보기: ${todayMission.title}`}
+              onClick={() => setMissionOpen(true)}
+              className="w-full rounded-[8px] border border-[var(--line)] bg-white p-3 text-left transition hover:border-[var(--leaf)] hover:bg-[#fbfdfb]"
+            >
+              <strong className="text-sm">{todayMission.title}</strong>
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+                {todayMission.prompt}
+              </p>
+              <p className="mt-2 text-xs font-bold text-[var(--plum)]">
+                {todayMission.difficulty} · {todayMission.completions}명 참여
+              </p>
+            </button>
           </section>
 
           <section className="rounded-[8px] border border-[var(--line)] bg-[#fff7dd] p-4">
@@ -885,6 +947,120 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
           </section>
         </aside>
       </section>
+
+      {missionOpen ? (
+        <div
+          className="fixed inset-0 z-[70] grid place-items-center bg-[rgba(44,41,38,0.5)] p-4 backdrop-blur-sm"
+          onClick={(event) => {
+            if (event.currentTarget === event.target) setMissionOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mission-dialog-title"
+            className="flex max-h-[min(86vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-[8px] border border-[var(--line)] bg-white shadow-[0_28px_80px_rgba(44,41,38,0.24)]"
+          >
+            <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--line)] px-4">
+              <h2 id="mission-dialog-title" className="text-sm font-bold">
+                오늘의 부부 미션
+              </h2>
+              <button
+                type="button"
+                aria-label="미션 닫기"
+                onClick={() => setMissionOpen(false)}
+                className="grid size-9 place-items-center rounded-[6px] text-[var(--ink-soft)] hover:bg-[#f4ebe3]"
+              >
+                <X className="size-5" />
+              </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="bg-[#fff9f3] px-5 py-6 md:px-7">
+                <p className="text-xs font-bold text-[var(--plum)]">
+                  AI가 고른 오늘의 미션
+                </p>
+                <h3 className="mt-2 font-serif text-2xl font-bold">
+                  {todayMission.title}
+                </h3>
+                <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
+                  {todayMission.prompt}
+                </p>
+                <div className="mt-5 flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold text-[var(--ink-soft)]">
+                    {todayMission.difficulty} · {todayMission.completions}명 참여
+                  </span>
+                  <button
+                    type="button"
+                    onClick={participateInMission}
+                    disabled={
+                      pendingMissionAction ||
+                      todayMission.participated ||
+                      sessionStatus === "loading"
+                    }
+                    className="h-10 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white disabled:cursor-default disabled:opacity-55"
+                  >
+                    {todayMission.participated ? "참여했어요" : "나도 참여"}
+                  </button>
+                </div>
+              </div>
+
+              <section className="px-5 py-5 md:px-7">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold">소감 나누기</h3>
+                  <span className="text-xs text-[var(--ink-soft)]">
+                    {todayMission.reflections.length}개
+                  </span>
+                </div>
+
+                <div className="mt-3 divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                  {todayMission.reflections.length > 0 ? (
+                    todayMission.reflections.map((reflection) => (
+                      <div key={reflection.id} className="py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <strong className="text-xs">{reflection.author}</strong>
+                          <span className="text-[11px] text-[var(--ink-soft)]">
+                            {reflection.createdAt}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+                          {reflection.body}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="py-6 text-center text-sm text-[var(--ink-soft)]">
+                      아직 나눈 소감이 없습니다.
+                    </p>
+                  )}
+                </div>
+
+                <form onSubmit={submitMissionReflection} className="mt-4">
+                  <textarea
+                    value={missionReflectionDraft}
+                    onChange={(event) =>
+                      setMissionReflectionDraft(event.target.value)
+                    }
+                    className="min-h-24 w-full resize-y rounded-[8px] border border-[var(--line)] p-3 text-sm leading-6 outline-none focus:border-[var(--plum)]"
+                    placeholder="미션을 해본 소감을 적어주세요"
+                  />
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={
+                        !missionReflectionDraft.trim() || pendingMissionAction
+                      }
+                      className="h-10 rounded-[8px] bg-[var(--coral)] px-4 text-sm font-bold text-white disabled:opacity-45"
+                    >
+                      소감 나누기
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {selectedPost && mobileDetailOpen ? (
         <section className="fixed inset-0 z-50 flex flex-col bg-[var(--background)] xl:hidden">

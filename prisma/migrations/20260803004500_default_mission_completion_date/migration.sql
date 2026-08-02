@@ -1,0 +1,2 @@
+ALTER TABLE "MissionCompletion"
+ALTER COLUMN "completedOn" SET DEFAULT CURRENT_DATE;
