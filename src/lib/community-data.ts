@@ -62,10 +62,10 @@ export type Mission = {
 
 export type Letter = {
   id: string;
-  title: string;
   body: string;
-  replies: number;
-  tone: "고마움" | "미안함" | "서운함";
+  upvotes: number;
+  downvotes: number;
+  myReaction: "up" | "down" | null;
 };
 
 export const categories: Array<{
@@ -129,24 +129,24 @@ export const missions: Mission[] = [
 export const letters: Letter[] = [
   {
     id: "l1",
-    title: "화낸 뒤에 바로 미안하다고 못 했어요",
-    body: "사실은 내 말투가 더 날카로웠다는 걸 알아요. 오늘은 먼저 말을 걸어보고 싶어요.",
-    replies: 18,
-    tone: "미안함",
+    body: "화낸 뒤에 바로 미안하다고 못 했어요. 사실은 내 말투가 더 날카로웠다는 걸 알아요. 오늘은 먼저 말을 걸어보고 싶어요.",
+    upvotes: 0,
+    downvotes: 0,
+    myReaction: null,
   },
   {
     id: "l2",
-    title: "요즘 당신이 버텨주는 게 보여요",
-    body: "큰 말은 못 했지만, 퇴근하고도 아이 목욕을 챙기는 모습을 계속 보고 있었어요.",
-    replies: 31,
-    tone: "고마움",
+    body: "요즘 당신이 버텨주는 게 보여요. 큰 말은 못 했지만, 퇴근하고도 아이 목욕을 챙기는 모습을 계속 보고 있었어요.",
+    upvotes: 0,
+    downvotes: 0,
+    myReaction: null,
   },
   {
     id: "l3",
-    title: "내 편이 아닌 것 같을 때가 있어요",
-    body: "시댁 이야기가 나오면 내가 설명해야 하는 사람이 되는 느낌이 들어요.",
-    replies: 42,
-    tone: "서운함",
+    body: "내 편이 아닌 것 같을 때가 있어요. 시댁 이야기가 나오면 내가 설명해야 하는 사람이 되는 느낌이 들어요.",
+    upvotes: 0,
+    downvotes: 0,
+    myReaction: null,
   },
 ];
 

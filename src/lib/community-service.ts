@@ -1,5 +1,6 @@
 import {
   CommentTone,
+  LetterReactionType,
   LetterTone,
   PostCategory,
   ReactionType,
@@ -7,6 +8,8 @@ import {
 } from "@/generated/prisma/enums";
 import type {
   CommentModel,
+  AnonymousLetterModel,
+  LetterReactionModel,
   PostModel,
   ReactionModel,
   VerdictVoteModel,
@@ -104,17 +107,19 @@ const verdictFromDb = {
   [VerdictChoice.NOT_ENOUGH]: "notEnough",
 } as const;
 
-const letterToneToDb = {
-  "고마움": LetterTone.THANKS,
-  "미안함": LetterTone.SORRY,
-  "서운함": LetterTone.HURT,
+const letterReactionToDb = {
+  up: LetterReactionType.UP,
+  down: LetterReactionType.DOWN,
 } as const;
 
-const letterToneFromDb = {
-  [LetterTone.THANKS]: "고마움",
-  [LetterTone.SORRY]: "미안함",
-  [LetterTone.HURT]: "서운함",
+const letterReactionFromDb = {
+  [LetterReactionType.UP]: "up",
+  [LetterReactionType.DOWN]: "down",
 } as const;
+
+type LetterWithReactions = AnonymousLetterModel & {
+  reactions: LetterReactionModel[];
+};
 
 export async function listCommunityPosts() {
   const posts = await prisma.post.findMany({
@@ -309,47 +314,117 @@ export async function completeCommunityMission(input: {
   });
 }
 
-export async function listAnonymousLetters(): Promise<Letter[]> {
+export async function listAnonymousLetters(anonKey?: string): Promise<Letter[]> {
   const records = await prisma.anonymousLetter.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      replies: true,
+      reactions: true,
     },
     take: 12,
   });
 
-  return records.map((letter) => ({
-    id: letter.id,
-    title: letter.title,
-    body: letter.body,
-    replies: letter.replies.length,
-    tone: letterToneFromDb[letter.tone],
-  }));
+  return records.map((letter) => toAnonymousLetter(letter, anonKey));
 }
 
 export async function createAnonymousLetter(input: {
-  title: string;
   body: string;
-  tone: keyof typeof letterToneToDb;
 }) {
   const letter = await prisma.anonymousLetter.create({
     data: {
-      title: input.title,
+      // Kept only for compatibility with the currently deployed reader.
+      title: input.body.split(/\r?\n/)[0]?.slice(0, 44) || "익명 편지",
       body: input.body,
-      tone: letterToneToDb[input.tone],
+      tone: LetterTone.HURT,
     },
     include: {
-      replies: true,
+      reactions: true,
     },
   });
 
+  return toAnonymousLetter(letter);
+}
+
+export async function reactToAnonymousLetter(input: {
+  letterId: string;
+  anonKey: string;
+  type: keyof typeof letterReactionToDb;
+}) {
+  const letter = await prisma.anonymousLetter.findUnique({
+    where: { id: input.letterId },
+    select: { id: true },
+  });
+  if (!letter) return null;
+
+  const existing = await prisma.letterReaction.findUnique({
+    where: {
+      letterId_anonKey: {
+        letterId: input.letterId,
+        anonKey: input.anonKey,
+      },
+    },
+  });
+  const type = letterReactionToDb[input.type];
+
+  if (existing?.type === type) {
+    await prisma.letterReaction.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.letterReaction.upsert({
+      where: {
+        letterId_anonKey: {
+          letterId: input.letterId,
+          anonKey: input.anonKey,
+        },
+      },
+      create: {
+        letterId: input.letterId,
+        anonKey: input.anonKey,
+        type,
+      },
+      update: { type },
+    });
+  }
+
+  const reactions = await prisma.letterReaction.findMany({
+    where: { letterId: input.letterId },
+  });
+
+  return summarizeLetterReactions(reactions, input.anonKey);
+}
+
+function toAnonymousLetter(
+  letter: LetterWithReactions,
+  anonKey?: string,
+): Letter {
+  const legacyTitle = letter.title.trim();
+  const body = letter.body.trim();
+  const combinedBody =
+    legacyTitle && !body.startsWith(legacyTitle)
+      ? `${legacyTitle}\n\n${body}`
+      : body;
+
   return {
     id: letter.id,
-    title: letter.title,
-    body: letter.body,
-    replies: letter.replies.length,
-    tone: letterToneFromDb[letter.tone],
+    body: combinedBody,
+    ...summarizeLetterReactions(letter.reactions, anonKey),
   };
+}
+
+function summarizeLetterReactions(
+  reactions: LetterReactionModel[],
+  anonKey?: string,
+) {
+  const ownReaction = anonKey
+    ? reactions.find((reaction) => reaction.anonKey === anonKey)
+    : undefined;
+
+  return {
+    upvotes: reactions.filter((reaction) => reaction.type === LetterReactionType.UP)
+      .length,
+    downvotes: reactions.filter(
+      (reaction) => reaction.type === LetterReactionType.DOWN,
+    ).length,
+    myReaction: ownReaction ? letterReactionFromDb[ownReaction.type] : null,
+  } satisfies Pick<Letter, "upvotes" | "downvotes" | "myReaction">;
 }
 
 export async function createTemperatureCheck(input: {

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { letters as seedLetters } from "@/lib/community-data";
 import { createLetterSchema } from "@/lib/community-schema";
@@ -7,9 +7,11 @@ import {
   listAnonymousLetters,
 } from "@/lib/community-service";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const letters = await listAnonymousLetters();
+    const letters = await listAnonymousLetters(
+      request.cookies.get("booboo_anon_id")?.value,
+    );
     return NextResponse.json({
       letters: letters.length > 0 ? letters : seedLetters,
       source: letters.length > 0 ? "database" : "seed",

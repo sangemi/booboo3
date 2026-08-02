@@ -28,9 +28,11 @@ export const createMissionCompletionSchema = z.object({
 });
 
 export const createLetterSchema = z.object({
-  title: z.string().trim().min(2).max(80),
   body: z.string().trim().min(5).max(2000),
-  tone: z.enum(["고마움", "미안함", "서운함"]),
+});
+
+export const createLetterReactionSchema = z.object({
+  type: z.enum(["up", "down"]),
 });
 
 export const createTemperatureCheckSchema = z.object({

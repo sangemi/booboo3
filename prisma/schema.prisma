@@ -35,6 +35,11 @@ enum LetterTone {
   HURT
 }
 
+enum LetterReactionType {
+  UP
+  DOWN
+}
+
 enum VerdictChoice {
   HUSBAND
   WIFE
@@ -313,15 +318,29 @@ model MissionCompletion {
 }
 
 model AnonymousLetter {
-  id        String        @id @default(cuid())
+  id        String           @id @default(cuid())
   title     String
   body      String
   tone      LetterTone
   authorId  String?
-  author    User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  author    User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
   replies   LetterReply[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  reactions LetterReaction[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model LetterReaction {
+  id        String             @id @default(cuid())
+  letterId  String
+  anonKey   String
+  type      LetterReactionType
+  letter    AnonymousLetter    @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@unique([letterId, anonKey])
+  @@index([letterId, type])
 }
 
 model LetterReply {

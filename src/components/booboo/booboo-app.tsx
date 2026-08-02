@@ -12,6 +12,7 @@ import {
   Send,
   Smile,
   Sparkles,
+  ThumbsDown,
   ThumbsUp,
   X,
 } from "lucide-react";
@@ -81,7 +82,8 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
   const [postAsMe, setPostAsMe] = useState(false);
   const [commentAsMe, setCommentAsMe] = useState(false);
   const [letterDraft, setLetterDraft] = useState("");
-  const [letterTone, setLetterTone] = useState<Letter["tone"] | null>(null);
+  const [selectedLetterId, setSelectedLetterId] = useState<string | null>(null);
+  const [pendingLetterReaction, setPendingLetterReaction] = useState(false);
   const [postSubmitError, setPostSubmitError] = useState("");
 
   useEffect(() => {
@@ -154,6 +156,9 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
 
   const selectedPost =
     posts.find((post) => post.id === selectedPostId) ?? filteredPosts[0] ?? posts[0];
+  const selectedLetter = communityLetters.find(
+    (letter) => letter.id === selectedLetterId,
+  );
   const selectedPostIndex = selectedPost
     ? filteredPosts.findIndex((post) => post.id === selectedPost.id)
     : -1;
@@ -173,6 +178,23 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
       document.body.style.overflow = originalOverflow;
     };
   }, [mobileDetailOpen]);
+
+  useEffect(() => {
+    if (!selectedLetterId) return;
+
+    const originalOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedLetterId(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [selectedLetterId]);
 
   function selectPost(post: CommunityPost) {
     setSelectedPostId(post.id);
@@ -397,15 +419,13 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
 
   async function submitLetter() {
     const body = letterDraft.trim();
-    if (!body || !letterTone) return;
-
-    const title = body.split(/\r?\n/)[0]?.slice(0, 44) || "차마 못 한 말";
+    if (!body) return;
 
     try {
       const response = await fetch("/api/community/letters", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, body, tone: letterTone }),
+        body: JSON.stringify({ body }),
       });
       if (!response.ok) return;
 
@@ -416,9 +436,40 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
 
       setCommunityLetters((current) => [payload.letter!, ...current]);
       setLetterDraft("");
-      setLetterTone(null);
     } catch {
       return;
+    }
+  }
+
+  async function reactToLetter(letterId: string, type: "up" | "down") {
+    if (pendingLetterReaction) return;
+    setPendingLetterReaction(true);
+
+    try {
+      const response = await fetch(
+        `/api/community/letters/${letterId}/reactions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type }),
+        },
+      );
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as {
+        reaction?: Pick<Letter, "upvotes" | "downvotes" | "myReaction">;
+      };
+      if (!payload.reaction) return;
+
+      setCommunityLetters((current) =>
+        current.map((letter) =>
+          letter.id === letterId ? { ...letter, ...payload.reaction } : letter,
+        ),
+      );
+    } catch {
+      return;
+    } finally {
+      setPendingLetterReaction(false);
     }
   }
 
@@ -837,37 +888,16 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
             </div>
             <div className="space-y-3">
               {communityLetters.map((letter) => (
-                <div key={letter.id} className="rounded-[8px] bg-white/72 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <strong className="text-sm">{letter.title}</strong>
-                    <span className="rounded-[6px] bg-[#fff0b5] px-2 py-1 text-xs font-bold text-[#7a5b00]">
-                      {letter.tone}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+                <button
+                  key={letter.id}
+                  type="button"
+                  aria-label={`익명 편지 읽기: ${letter.body.slice(0, 30)}`}
+                  onClick={() => setSelectedLetterId(letter.id)}
+                  className="block w-full rounded-[8px] bg-white/72 p-3 text-left transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#c8a84e]"
+                >
+                  <p className="line-clamp-4 whitespace-pre-line text-sm font-normal leading-6 text-[var(--ink-soft)]">
                     {letter.body}
                   </p>
-                  <p className="mt-2 text-xs font-bold text-[var(--plum)]">
-                    응답 {letter.replies}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-1 rounded-[8px] bg-white/72 p-1">
-              {(["고마움", "미안함", "서운함"] as const).map((tone) => (
-                <button
-                  key={tone}
-                  type="button"
-                  aria-pressed={letterTone === tone}
-                  onClick={() => setLetterTone(tone)}
-                  className={cn(
-                    "h-9 rounded-[6px] text-xs font-bold transition",
-                    letterTone === tone
-                      ? "bg-[#7a5b00] text-white"
-                      : "text-[#7a5b00] hover:bg-[#fff0b5]",
-                  )}
-                >
-                  {tone}
                 </button>
               ))}
             </div>
@@ -879,7 +909,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
             />
             <button
               onClick={submitLetter}
-              disabled={!letterDraft.trim() || !letterTone}
+              disabled={!letterDraft.trim()}
               className="mt-2 h-10 w-full rounded-[8px] bg-[#7a5b00] text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
               익명으로 접어두기
@@ -939,8 +969,98 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
         </section>
       ) : null}
 
+      {selectedLetter ? (
+        <div
+          className="fixed inset-0 z-[70] grid place-items-center bg-[rgba(44,41,38,0.5)] p-4 backdrop-blur-sm"
+          onClick={(event) => {
+            if (event.currentTarget === event.target) setSelectedLetterId(null);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="letter-dialog-title"
+            className="flex max-h-[min(78vh,640px)] w-full max-w-xl flex-col overflow-hidden rounded-[8px] border border-[#ead18a] bg-[#fffdf5] shadow-[0_28px_80px_rgba(44,41,38,0.24)]"
+          >
+            <header className="flex h-14 shrink-0 items-center justify-between border-b border-[#ead18a] px-4">
+              <h2 id="letter-dialog-title" className="text-sm font-bold text-[#5f4b16]">
+                익명 편지
+              </h2>
+              <button
+                type="button"
+                aria-label="편지 닫기"
+                onClick={() => setSelectedLetterId(null)}
+                className="grid size-9 place-items-center rounded-[6px] text-[var(--ink-soft)] hover:bg-[#fff0b5]"
+              >
+                <X className="size-5" />
+              </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 md:px-7">
+              <p className="whitespace-pre-line text-base font-normal leading-8 text-[var(--ink-soft)]">
+                {selectedLetter.body}
+              </p>
+            </div>
+
+            <footer className="flex shrink-0 justify-center gap-2 border-t border-[#ead18a] bg-white/60 px-4 py-4">
+              <LetterReactionButton
+                label="공감"
+                icon={ThumbsUp}
+                value={selectedLetter.upvotes}
+                selected={selectedLetter.myReaction === "up"}
+                disabled={pendingLetterReaction}
+                onClick={() => reactToLetter(selectedLetter.id, "up")}
+              />
+              <LetterReactionButton
+                label="비공감"
+                icon={ThumbsDown}
+                value={selectedLetter.downvotes}
+                selected={selectedLetter.myReaction === "down"}
+                disabled={pendingLetterReaction}
+                onClick={() => reactToLetter(selectedLetter.id, "down")}
+              />
+            </footer>
+          </section>
+        </div>
+      ) : null}
+
       <SiteFooter />
     </main>
+  );
+}
+
+function LetterReactionButton({
+  icon: Icon,
+  label,
+  value,
+  selected,
+  disabled,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  selected: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`${label} ${value}`}
+      aria-pressed={selected}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-[8px] border px-4 text-sm font-bold transition disabled:opacity-50",
+        selected
+          ? "border-[#7a5b00] bg-[#7a5b00] text-white"
+          : "border-[#dac993] bg-white text-[#6d5a25] hover:border-[#9b8139]",
+      )}
+    >
+      <Icon className="size-4" />
+      <span>{value}</span>
+    </button>
   );
 }
 

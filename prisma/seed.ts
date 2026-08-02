@@ -32,12 +32,6 @@ const commentToneToDb = {
   question: CommentTone.QUESTION,
 } as const;
 
-const letterToneToDb = {
-  "고마움": LetterTone.THANKS,
-  "미안함": LetterTone.SORRY,
-  "서운함": LetterTone.HURT,
-} as const;
-
 async function main() {
   await ensureDefaultAiOperationLogs();
 
@@ -83,14 +77,14 @@ async function main() {
       where: { id: letter.id },
       create: {
         id: letter.id,
-        title: letter.title,
+        title: letter.body.slice(0, 44),
         body: letter.body,
-        tone: letterToneToDb[letter.tone],
+        tone: LetterTone.HURT,
       },
       update: {
-        title: letter.title,
+        title: letter.body.slice(0, 44),
         body: letter.body,
-        tone: letterToneToDb[letter.tone],
+        tone: LetterTone.HURT,
       },
     });
   }
