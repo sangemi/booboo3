@@ -270,6 +270,7 @@ model Reaction {
 
   @@unique([postId, type, userId])
   @@index([postId, type])
+  @@index([userId, type, createdAt])
 }
 
 model VerdictVote {

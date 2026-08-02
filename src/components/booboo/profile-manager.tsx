@@ -15,6 +15,7 @@ import { signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 
 import { VerifiedName } from "@/components/booboo/verified-name";
+import { AccountNavigation } from "@/components/booboo/account-navigation";
 
 type Persona = {
   id: string;
@@ -272,6 +273,8 @@ export function ProfileManager() {
             <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
               나를 설명하는 정보 가운데 공개할 것만 골라 관리하세요.
             </p>
+
+            <AccountNavigation active="profile" />
 
             <div className="mt-6 border-t border-[var(--line)] pt-5">
               <p className="text-xs font-bold text-[var(--ink-soft)]">연결된 로그인</p>

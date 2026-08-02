@@ -25,6 +25,7 @@ export type CommunityPost = {
   readMinutes: number;
   comments: CommentItem[];
   reactions: ReactionState;
+  myReactions?: ReactionSelection;
   verdicts: VerdictState;
   myVerdict?: keyof VerdictState | null;
   tags: string[];
@@ -45,6 +46,13 @@ export type ReactionState = {
   hug: number;
   saved: number;
   helpful: number;
+};
+
+export type ReactionSelection = {
+  meToo: boolean;
+  hug: boolean;
+  saved: boolean;
+  helpful: boolean;
 };
 
 export type VerdictState = {

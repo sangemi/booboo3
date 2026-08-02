@@ -228,36 +228,40 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     postId: string,
     type: keyof CommunityPost["reactions"],
   ) {
-    setPosts((current) =>
-      current.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              reactions: {
-                ...post.reactions,
-                [type]: post.reactions[type] + 1,
-              },
-            }
-          : post,
-      ),
-    );
+    if (!session?.user) {
+      const callbackUrl = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      return;
+    }
 
     try {
-      const response = await fetch(`/api/community/posts/${postId}/reactions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
-      });
+      const response = await fetch(
+        type === "saved"
+          ? "/api/profile/scraps"
+          : `/api/community/posts/${postId}/reactions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(type === "saved" ? { postId } : { type }),
+        },
+      );
       if (!response.ok) return;
 
       const payload = (await response.json()) as {
         reactions?: CommunityPost["reactions"];
+        myReactions?: CommunityPost["myReactions"];
       };
-      if (!payload.reactions) return;
+      if (!payload.reactions || !payload.myReactions) return;
 
       setPosts((current) =>
         current.map((post) =>
-          post.id === postId ? { ...post, reactions: payload.reactions! } : post,
+          post.id === postId
+            ? {
+                ...post,
+                reactions: payload.reactions!,
+                myReactions: payload.myReactions,
+              }
+            : post,
         ),
       );
     } catch {
@@ -710,32 +714,10 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
                   ))}
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-2">
-                  <ReactionButton
-                    icon={Heart}
-                    label="나도 그래요"
-                    value={selectedPost.reactions.meToo}
-                    onClick={() => reactToPost(selectedPost.id, "meToo")}
-                  />
-                  <ReactionButton
-                    icon={Smile}
-                    label="응원해요"
-                    value={selectedPost.reactions.hug}
-                    onClick={() => reactToPost(selectedPost.id, "hug")}
-                  />
-                  <ReactionButton
-                    icon={Bookmark}
-                    label="저장"
-                    value={selectedPost.reactions.saved}
-                    onClick={() => reactToPost(selectedPost.id, "saved")}
-                  />
-                  <ReactionButton
-                    icon={ThumbsUp}
-                    label="도움돼요"
-                    value={selectedPost.reactions.helpful}
-                    onClick={() => reactToPost(selectedPost.id, "helpful")}
-                  />
-                </div>
+                <PostActions
+                  post={selectedPost}
+                  onReact={(type) => reactToPost(selectedPost.id, type)}
+                />
 
                 {selectedPost.category === "verdict" ? (
                   <VerdictPanel
@@ -876,7 +858,12 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
                   onClick={() => setSelectedLetterId(letter.id)}
                   className="block w-full rounded-[8px] bg-white/72 p-3 text-left transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#c8a84e]"
                 >
-                  <p className="line-clamp-4 whitespace-pre-line text-sm font-normal leading-6 text-[var(--ink-soft)]">
+                  <p
+                    className={cn(
+                      "line-clamp-4 whitespace-pre-line font-normal leading-6 text-[var(--ink-soft)]",
+                      letterTextSize(letter, "list"),
+                    )}
+                  >
                     {letter.body}
                   </p>
                 </button>
@@ -893,7 +880,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
               disabled={!letterDraft.trim()}
               className="mt-2 h-10 w-full rounded-[8px] bg-[#7a5b00] text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
-              익명으로 접어두기
+              편지 쓰기
             </button>
           </section>
         </aside>
@@ -978,7 +965,12 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 md:px-7">
-              <p className="whitespace-pre-line text-base font-normal leading-8 text-[var(--ink-soft)]">
+              <p
+                className={cn(
+                  "whitespace-pre-line font-normal leading-8 text-[var(--ink-soft)]",
+                  letterTextSize(selectedLetter, "detail"),
+                )}
+              >
                 {selectedLetter.body}
               </p>
             </div>
@@ -1043,6 +1035,16 @@ function LetterReactionButton({
       <span>{value}</span>
     </button>
   );
+}
+
+function letterTextSize(letter: Letter, context: "list" | "detail") {
+  if (letter.upvotes > letter.downvotes) {
+    return context === "list" ? "text-base" : "text-lg";
+  }
+  if (letter.downvotes > letter.upvotes) {
+    return context === "list" ? "text-xs" : "text-sm";
+  }
+  return context === "list" ? "text-sm" : "text-base";
 }
 
 function VerdictPanel({
@@ -1168,32 +1170,7 @@ function MobilePostDetail({
         ))}
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2">
-        <ReactionButton
-          icon={Heart}
-          label="나도 그래요"
-          value={post.reactions.meToo}
-          onClick={() => onReact("meToo")}
-        />
-        <ReactionButton
-          icon={Smile}
-          label="응원해요"
-          value={post.reactions.hug}
-          onClick={() => onReact("hug")}
-        />
-        <ReactionButton
-          icon={Bookmark}
-          label="저장"
-          value={post.reactions.saved}
-          onClick={() => onReact("saved")}
-        />
-        <ReactionButton
-          icon={ThumbsUp}
-          label="도움돼요"
-          value={post.reactions.helpful}
-          onClick={() => onReact("helpful")}
-        />
-      </div>
+      <PostActions post={post} onReact={onReact} />
 
       {post.category === "verdict" ? (
         <VerdictPanel
@@ -1296,27 +1273,87 @@ function CommentIdentityControl({
   );
 }
 
+function PostActions({
+  post,
+  onReact,
+}: {
+  post: CommunityPost;
+  onReact: (type: keyof CommunityPost["reactions"]) => void;
+}) {
+  const bookmarked = post.myReactions?.saved ?? false;
+
+  return (
+    <div className="mt-5 flex items-stretch gap-2">
+      <div className="grid min-w-0 flex-1 grid-cols-3 overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
+        <ReactionButton
+          icon={Heart}
+          label="나도 그래요"
+          value={post.reactions.meToo}
+          selected={post.myReactions?.meToo ?? false}
+          onClick={() => onReact("meToo")}
+        />
+        <ReactionButton
+          icon={Smile}
+          label="응원해요"
+          value={post.reactions.hug}
+          selected={post.myReactions?.hug ?? false}
+          onClick={() => onReact("hug")}
+        />
+        <ReactionButton
+          icon={ThumbsUp}
+          label="도움돼요"
+          value={post.reactions.helpful}
+          selected={post.myReactions?.helpful ?? false}
+          onClick={() => onReact("helpful")}
+        />
+      </div>
+      <button
+        type="button"
+        aria-pressed={bookmarked}
+        title={bookmarked ? "스크랩에서 삭제" : "내 스크랩에 저장"}
+        onClick={() => onReact("saved")}
+        className={cn(
+          "flex w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-[8px] border text-xs font-bold transition",
+          bookmarked
+            ? "border-[var(--plum)] bg-[#f4ebe3] text-[var(--plum)]"
+            : "border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--plum)]",
+        )}
+      >
+        <Bookmark className={cn("size-4", bookmarked ? "fill-current" : "")} />
+        저장
+      </button>
+    </div>
+  );
+}
+
 function ReactionButton({
   icon: Icon,
   label,
   value,
+  selected,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
+  selected: boolean;
   onClick: () => void;
 }) {
   return (
     <button
+      type="button"
+      aria-pressed={selected}
       onClick={onClick}
-      className="flex min-h-12 items-center justify-between rounded-[8px] border border-[var(--line)] px-3 text-sm font-bold transition hover:border-[var(--coral)] hover:bg-[#fff6f2]"
+      className={cn(
+        "flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 border-r border-[var(--line)] px-1 text-[11px] font-bold transition last:border-r-0",
+        selected
+          ? "bg-[#fff0eb] text-[var(--coral)]"
+          : "text-[var(--ink-soft)] hover:bg-[#fff6f2] hover:text-[var(--foreground)]",
+      )}
     >
-      <span className="inline-flex items-center gap-2">
-        <Icon className="size-4 text-[var(--coral)]" />
-        {label}
-      </span>
-      <span>{value}</span>
+      <Icon className="size-3.5 shrink-0 text-[var(--coral)]" />
+      <span className="whitespace-nowrap leading-5">{label}</span>
+      <span className="text-[11px] font-normal">{value}</span>
     </button>
   );
 }

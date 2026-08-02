@@ -46,7 +46,9 @@ type AuthValues = LoginForm & {
 export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = safeRedirect(searchParams.get("redirect"));
+  const redirectTo = safeRedirect(
+    searchParams.get("callbackUrl") ?? searchParams.get("redirect"),
+  );
   const [error, setError] = useState("");
   const [socialLoading, setSocialLoading] = useState<"google" | "kakao" | null>(
     null,
@@ -269,7 +271,7 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
       <p className="mt-6 text-center text-sm text-[var(--ink-soft)]">
         {isRegister ? "이미 계정이 있나요?" : "처음 오셨나요?"}{" "}
         <Link
-          href={`${isRegister ? "/login" : "/register"}?redirect=${encodeURIComponent(redirectTo)}`}
+          href={`${isRegister ? "/login" : "/register"}?callbackUrl=${encodeURIComponent(redirectTo)}`}
           className="font-bold text-[var(--plum)] hover:underline"
         >
           {isRegister ? "로그인" : "회원가입"}

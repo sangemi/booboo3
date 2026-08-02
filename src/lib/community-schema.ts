@@ -16,7 +16,11 @@ export const createCommentSchema = z.object({
 });
 
 export const createReactionSchema = z.object({
-  type: z.enum(["meToo", "hug", "saved", "helpful"]),
+  type: z.enum(["meToo", "hug", "helpful"]),
+});
+
+export const toggleScrapSchema = z.object({
+  postId: z.string().trim().min(1),
 });
 
 export const createVerdictVoteSchema = z.object({

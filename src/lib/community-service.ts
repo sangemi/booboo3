@@ -17,6 +17,7 @@ import type {
 import type {
   CommunityPost,
   Letter,
+  ReactionSelection,
   ReactionState,
   VerdictState,
 } from "@/lib/community-data";
@@ -251,30 +252,67 @@ export async function createCommunityComment(input: {
 
 export async function createCommunityReaction(input: {
   postId: string;
+  userId: string;
   type: keyof typeof reactionToDb;
-  anonKey?: string;
 }) {
-  await prisma.reaction.create({
-    data: {
-      postId: input.postId,
-      type: reactionToDb[input.type],
-      anonKey: input.anonKey,
+  const type = reactionToDb[input.type];
+  const existing = await prisma.reaction.findUnique({
+    where: {
+      postId_type_userId: {
+        postId: input.postId,
+        type,
+        userId: input.userId,
+      },
     },
   });
 
-  const grouped = await prisma.reaction.groupBy({
-    by: ["type"],
+  if (existing) {
+    await prisma.reaction.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.reaction.create({
+      data: {
+        postId: input.postId,
+        userId: input.userId,
+        type,
+      },
+    });
+  }
+
+  const reactions = await prisma.reaction.findMany({
     where: { postId: input.postId },
-    _count: { type: true },
   });
 
-  return grouped.reduce<ReactionState>(
-    (state, item) => {
-      state[reactionFromDb[item.type]] = item._count.type;
-      return state;
+  return summarizePostReactions(reactions, input.userId);
+}
+
+export async function listCommunityScraps(userId: string) {
+  const scraps = await prisma.reaction.findMany({
+    where: {
+      userId,
+      type: ReactionType.SAVED,
     },
-    { meToo: 0, hug: 0, saved: 0, helpful: 0 },
-  );
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      createdAt: true,
+      post: {
+        select: {
+          publicId: true,
+          category: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  return scraps.map((scrap) => ({
+    id: scrap.id,
+    savedAt: scrap.createdAt,
+    post: {
+      ...scrap.post,
+      category: categoryFromDb[scrap.post.category],
+    },
+  }));
 }
 
 export async function createCommunityVerdictVote(input: {
@@ -498,13 +536,7 @@ function toCommunityPost(
       tone: commentToneFromDb[comment.tone],
       createdAt: relativeTime(comment.createdAt),
     })),
-    reactions: post.reactions.reduce<ReactionState>(
-      (state, reaction) => {
-        state[reactionFromDb[reaction.type]] += 1;
-        return state;
-      },
-      { meToo: 0, hug: 0, saved: 0, helpful: 0 },
-    ),
+    ...summarizePostReactions(post.reactions, currentUserId),
     verdicts: post.verdictVotes.reduce<VerdictState>(
       (state, vote) => {
         state[verdictFromDb[vote.choice]] += 1;
@@ -516,6 +548,30 @@ function toCommunityPost(
     tags: post.tags,
     pinned: post.isPinned,
   };
+}
+
+function summarizePostReactions(
+  reactions: ReactionModel[],
+  currentUserId?: string,
+): { reactions: ReactionState; myReactions: ReactionSelection } {
+  const counts = reactions.reduce<ReactionState>(
+    (state, reaction) => {
+      state[reactionFromDb[reaction.type]] += 1;
+      return state;
+    },
+    { meToo: 0, hug: 0, saved: 0, helpful: 0 },
+  );
+  const selected = reactions.reduce<ReactionSelection>(
+    (state, reaction) => {
+      if (currentUserId && reaction.userId === currentUserId) {
+        state[reactionFromDb[reaction.type]] = true;
+      }
+      return state;
+    },
+    { meToo: false, hug: false, saved: false, helpful: false },
+  );
+
+  return { reactions: counts, myReactions: selected };
 }
 
 function moodFromTemperature(score?: number) {
