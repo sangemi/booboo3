@@ -67,7 +67,7 @@ export function SiteHeader({
   }, [profileOpen]);
 
   return (
-    <header className="border-b border-[var(--line)] bg-[rgba(255,250,246,0.9)] backdrop-blur">
+    <header className="relative z-[80] border-b border-[var(--line)] bg-[rgba(255,250,246,0.9)] backdrop-blur">
       <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-4 px-4 py-3 md:px-8">
         <Link href="/" className="flex items-center gap-3">
           <Image
@@ -148,7 +148,7 @@ export function SiteHeader({
               {profileOpen ? (
                 <div
                   role="menu"
-                  className="absolute right-0 top-12 z-50 w-48 overflow-hidden rounded-[8px] border border-[var(--line)] bg-white py-1 shadow-[0_16px_40px_rgba(44,41,38,0.16)]"
+                  className="absolute right-0 top-12 z-[100] w-48 overflow-hidden rounded-[8px] border border-[var(--line)] bg-white py-1 shadow-[0_16px_40px_rgba(44,41,38,0.16)]"
                 >
                   <Link href="/mypage" onClick={() => setProfileOpen(false)} role="menuitem" className="flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-[#faf7f4]">
                     <UserRound className="size-4 text-[var(--ink-soft)]" /> 내 프로필

@@ -591,7 +591,7 @@ export function BoobooApp({
 
       <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 md:px-8 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_280px]">
         <section className="min-w-0 space-y-4">
-          <div className="rounded-[8px] border border-[var(--line)] bg-[var(--paper)] px-4 py-3 md:px-5">
+          <div className="rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] px-4 py-3 text-[#6f6964] md:px-5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-6 md:text-base">
               <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 text-[11px] font-bold text-[var(--plum)]">
                 <Sparkles className="size-3.5" />
@@ -605,7 +605,7 @@ export function BoobooApp({
             </p>
           </div>
 
-          <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[var(--line)] bg-[var(--paper)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {categories.map((category) => {
               const active = activeCategory === category.key;
 
@@ -722,7 +722,7 @@ export function BoobooApp({
           ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
+            <div className="overflow-hidden rounded-[8px] border border-[#ebe3dc] bg-[#fffdfa]">
               {filteredPosts.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-sm text-[var(--ink-soft)]">
@@ -750,8 +750,8 @@ export function BoobooApp({
                     href={postHref(post.publicId)}
                     onClick={() => selectPost(post)}
                     className={cn(
-                      "block border-b border-[var(--line)] px-3 py-2.5 transition last:border-b-0 hover:bg-[#fbf6f0]",
-                      selected ? "bg-[#fbf6f0]" : "bg-white",
+                      "block border-b border-[#eee7e1] px-3 py-2.5 transition last:border-b-0 hover:bg-[#faf6f2]",
+                      selected ? "bg-[#faf6f2]" : "bg-[#fffdfa]",
                     )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -782,7 +782,9 @@ export function BoobooApp({
                     <h3
                       className={cn(
                         "mt-2 text-sm leading-snug md:text-base",
-                        selected ? "font-extrabold" : "font-normal",
+                        selected
+                          ? "font-extrabold text-[var(--foreground)]"
+                          : "font-normal text-[#716b66]",
                       )}
                     >
                       {post.title}
@@ -793,13 +795,13 @@ export function BoobooApp({
             </div>
 
             {selectedPost ? (
-              <article className="hidden rounded-[8px] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(75,54,38,0.08)] xl:sticky xl:top-4 xl:block xl:self-start">
+              <article className="hidden rounded-[8px] border border-[#ddd2c9] bg-white p-6 shadow-[0_20px_56px_rgba(55,42,32,0.12)] xl:sticky xl:top-4 xl:block xl:self-start">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
                     {categoryLabels[selectedPost.category]}
                   </span>
                 </div>
-                <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
+                <h3 className="mt-4 font-serif text-4xl font-bold leading-[1.28] text-[var(--foreground)]">
                   {selectedPost.title}
                 </h3>
                 <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -812,7 +814,7 @@ export function BoobooApp({
                     · {selectedPost.createdAt}
                   </span>
                 </div>
-                <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[var(--ink-soft)]">
+                <p className="mt-5 whitespace-pre-line text-[15px] leading-8 text-[#3f3a36]">
                   {selectedPost.body}
                 </p>
 
@@ -921,7 +923,7 @@ export function BoobooApp({
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <section className="rounded-[8px] border border-[var(--line)] bg-[var(--paper)] p-4">
+          <section className="rounded-[8px] border border-[#ebe3dc] bg-[#fcfaf8] p-4 text-[#716b66]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-extrabold">오늘의 부부 미션</h2>
               <Flame className="size-4 text-[var(--coral)]" />
@@ -930,7 +932,7 @@ export function BoobooApp({
               type="button"
               aria-label={`오늘의 미션 보기: ${todayMission.title}`}
               onClick={() => setMissionOpen(true)}
-              className="w-full rounded-[8px] border border-[var(--line)] bg-white p-3 text-left transition hover:border-[var(--leaf)] hover:bg-[#fbfdfb]"
+              className="w-full rounded-[8px] border border-[#ece4dd] bg-white/80 p-3 text-left transition hover:border-[#aebfaf] hover:bg-white"
             >
               <strong className="text-sm">{todayMission.title}</strong>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
@@ -942,12 +944,12 @@ export function BoobooApp({
             </button>
           </section>
 
-          <section className="rounded-[8px] border border-[var(--line)] bg-[#fff7dd] p-4">
+          <section className="rounded-[8px] border border-[#eee5cc] bg-[#fffaf0] p-4">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-extrabold">익명 편지함</h2>
-              <Lock className="size-4 text-[#987000]" />
+              <Lock className="size-4 text-[#9b8140]" />
             </div>
-            <p className="mb-3 text-xs leading-5 text-[#725d23]">
+            <p className="mb-3 text-xs leading-5 text-[#7b6c45]">
               작성한 편지는 이름 없이 공개됩니다.
             </p>
             <div className="space-y-3">
@@ -962,7 +964,7 @@ export function BoobooApp({
                   type="button"
                   aria-label={`익명 편지 읽기: ${letter.body.slice(0, 30)}`}
                   onClick={() => setSelectedLetterId(letter.id)}
-                  className="block w-full rounded-[8px] bg-white/72 p-3 text-left transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#c8a84e]"
+                  className="block w-full rounded-[8px] bg-white/65 p-3 text-left transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#c8a84e]"
                 >
                   <p
                     className={cn(
@@ -978,13 +980,13 @@ export function BoobooApp({
             <textarea
               value={letterDraft}
               onChange={(event) => setLetterDraft(event.target.value)}
-              className="mt-3 min-h-20 w-full resize-none rounded-[8px] border border-[#ead18a] bg-white/80 p-3 text-sm outline-none focus:border-[#987000]"
+              className="mt-3 min-h-20 w-full resize-none rounded-[8px] border border-[#e8dcb9] bg-white/80 p-3 text-sm outline-none focus:border-[#a38a4c]"
               placeholder="이름 없이 나누고 싶은 말을 적어주세요"
             />
             <button
               onClick={submitLetter}
               disabled={!letterDraft.trim()}
-              className="mt-2 h-10 w-full rounded-[8px] bg-[#7a5b00] text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
+              className="mt-2 h-10 w-full rounded-[8px] bg-[#806a32] text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
               편지 쓰기
             </button>
@@ -1362,13 +1364,13 @@ function MobilePostDetail({
   onVerdict: (choice: keyof VerdictState) => void;
 }) {
   return (
-    <article className="rounded-[8px] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(75,54,38,0.08)]">
+    <article className="rounded-[8px] border border-[#ddd2c9] bg-white p-5 shadow-[0_20px_56px_rgba(55,42,32,0.12)]">
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
           {categoryLabels[post.category]}
         </span>
       </div>
-      <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
+      <h3 className="mt-4 font-serif text-3xl font-bold leading-[1.3] text-[var(--foreground)]">
         {post.title}
       </h3>
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1379,7 +1381,7 @@ function MobilePostDetail({
         />
         <span className="text-xs text-[var(--ink-soft)]">· {post.createdAt}</span>
       </div>
-      <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[var(--ink-soft)]">
+      <p className="mt-5 whitespace-pre-line text-[15px] leading-8 text-[#3f3a36]">
         {post.body}
       </p>
 
