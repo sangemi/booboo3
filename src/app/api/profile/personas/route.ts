@@ -7,7 +7,11 @@ import { prisma } from "@/lib/db";
 import { normalizePersonaValue, personaLabels } from "@/lib/persona";
 
 const createPersonaSchema = z.object({
-  type: z.nativeEnum(PersonaType),
+  type: z.nativeEnum(PersonaType).refine(
+    (type) =>
+      type !== PersonaType.EMPLOYER && type !== PersonaType.OTHER,
+    "현재 추가할 수 없는 페르소나입니다.",
+  ),
   value: z.string().trim().min(1).max(60),
   isPublic: z.boolean().default(true),
 });

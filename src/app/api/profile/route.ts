@@ -33,6 +33,7 @@ export async function GET() {
           type: true,
           label: true,
           value: true,
+          normalizedValue: true,
           isPublic: true,
           status: true,
           source: true,

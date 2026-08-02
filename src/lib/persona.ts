@@ -5,13 +5,18 @@ import {
   PersonaVerificationStatus,
 } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
+import {
+  formatMarriageYear,
+  marriageYearRange,
+  parseMarriageYear,
+} from "@/lib/marriage-persona";
 
 export const personaLabels: Record<PersonaType, string> = {
   [PersonaType.GENDER]: "성별",
   [PersonaType.AGE_GROUP]: "나이대",
   [PersonaType.EMPLOYER]: "직장",
   [PersonaType.PROFESSION]: "직업",
-  [PersonaType.MARRIAGE_YEARS]: "결혼 연차",
+  [PersonaType.MARRIAGE_YEARS]: "결혼연도",
   [PersonaType.PARENTING]: "부모 경험",
   [PersonaType.OTHER]: "나를 설명하는 말",
 };
@@ -38,14 +43,18 @@ export function normalizePersonaValue(type: PersonaType, rawValue: string) {
   }
 
   if (type === PersonaType.MARRIAGE_YEARS) {
-    const years = Number(value.replace(/[^0-9]/g, ""));
-    if (!Number.isInteger(years) || years < 0 || years > 80) {
-      throw new Error("결혼 연차는 0년부터 80년 사이로 입력해 주세요.");
+    // The enum name is kept for database compatibility; its value is now a marriage year.
+    const marriageYear = parseMarriageYear(value);
+    if (marriageYear === null) {
+      const range = marriageYearRange();
+      throw new Error(
+        `결혼연도는 ${range.min}년부터 ${range.max}년 사이의 네 자리 숫자로 입력해 주세요.`,
+      );
     }
 
     return {
-      value: years === 0 ? "신혼" : `결혼 ${years}년 차`,
-      normalizedValue: String(years),
+      value: formatMarriageYear(marriageYear),
+      normalizedValue: String(marriageYear),
     };
   }
 

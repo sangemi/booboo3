@@ -16,12 +16,18 @@ import { useCallback, useEffect, useState } from "react";
 
 import { VerifiedName } from "@/components/booboo/verified-name";
 import { AccountNavigation } from "@/components/booboo/account-navigation";
+import {
+  formatMarriageYear,
+  marriageYearRange,
+  parseMarriageYear,
+} from "@/lib/marriage-persona";
 
 type Persona = {
   id: string;
   type: PersonaType;
   label: string;
   value: string;
+  normalizedValue: string;
   isPublic: boolean;
   status: "DECLARED" | "PENDING" | "VERIFIED" | "REJECTED";
   source: "SELF" | "GOOGLE" | "KAKAO" | "WORK_EMAIL" | "DOCUMENT" | "ADMIN";
@@ -49,13 +55,11 @@ type PersonaType =
   | "OTHER";
 
 const personaOptions: Array<{ value: PersonaType; label: string }> = [
-  { value: "MARRIAGE_YEARS", label: "결혼 연차" },
+  { value: "MARRIAGE_YEARS", label: "결혼연도" },
   { value: "GENDER", label: "성별" },
   { value: "AGE_GROUP", label: "나이대" },
   { value: "PROFESSION", label: "직업" },
-  { value: "EMPLOYER", label: "직장" },
   { value: "PARENTING", label: "부모 경험" },
-  { value: "OTHER", label: "직접 입력" },
 ];
 
 const statusLabels: Record<Persona["status"], string> = {
@@ -341,7 +345,9 @@ export function ProfileManager() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-bold text-[var(--ink-soft)]">
-                            {persona.label}
+                            {persona.type === "MARRIAGE_YEARS"
+                              ? "결혼연도"
+                              : persona.label}
                           </span>
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${statusClass(persona.status)}`}
@@ -352,7 +358,9 @@ export function ProfileManager() {
                             {statusLabels[persona.status]}
                           </span>
                         </div>
-                        <p className="mt-1 truncate text-sm font-bold">{persona.value}</p>
+                        <p className="mt-1 truncate text-sm font-bold">
+                          {personaDisplayValue(persona)}
+                        </p>
                         <p className="mt-1 text-xs text-[var(--ink-soft)]">
                           {sourceLabels[persona.source]}
                         </p>
@@ -388,7 +396,7 @@ export function ProfileManager() {
                 )}
               </div>
 
-              <form onSubmit={addPersona} className="mt-4 grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)_auto]">
+              <form onSubmit={addPersona} className="mt-4 grid items-start gap-2 sm:grid-cols-[150px_minmax(0,1fr)_auto]">
                 <select
                   value={personaType}
                   onChange={(event) => {
@@ -420,12 +428,15 @@ export function ProfileManager() {
                     onChange={(event) => setPersonaPublic(event.target.checked)}
                     className="size-4 accent-[var(--plum)]"
                   />
-                  다른 회원에게 공개
+                  이 페르소나를 다른 회원에게 공개
                 </label>
               </form>
-              <p className="mt-3 text-xs leading-5 text-[var(--ink-soft)]">
-                회사 이메일과 서류를 이용한 추가 인증은 다음 단계에서 연결합니다.
-              </p>
+              <div className="mt-3 space-y-1 text-xs leading-5 text-[var(--ink-soft)]">
+                <p>공개 여부는 페르소나마다 따로 설정할 수 있습니다.</p>
+                <p>
+                  회사 이메일과 서류를 이용한 추가 인증은 다음 단계에서 연결합니다.
+                </p>
+              </div>
             </section>
 
             {message ? (
@@ -452,6 +463,32 @@ function personaValueInput(
 ) {
   const className =
     "h-10 min-w-0 rounded-[8px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--plum)]";
+
+  if (type === "MARRIAGE_YEARS") {
+    const range = marriageYearRange();
+    const marriageYear = parseMarriageYear(value);
+
+    return (
+      <div className="min-w-0">
+        <input
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          type="number"
+          inputMode="numeric"
+          min={range.min}
+          max={range.max}
+          placeholder="예: 2019"
+          className={`${className} w-full`}
+          aria-label="결혼연도"
+        />
+        {marriageYear !== null ? (
+          <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
+            다음과 같이 표시됩니다: {formatMarriageYear(marriageYear)}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   if (type === "GENDER") {
     return (
@@ -489,9 +526,7 @@ function personaValueInput(
     <input
       value={value}
       onChange={(event) => setValue(event.target.value)}
-      type={type === "MARRIAGE_YEARS" ? "number" : "text"}
-      min={type === "MARRIAGE_YEARS" ? 0 : undefined}
-      max={type === "MARRIAGE_YEARS" ? 80 : undefined}
+      type="text"
       placeholder={personaPlaceholder(type)}
       className={className}
       aria-label="페르소나 내용"
@@ -500,10 +535,15 @@ function personaValueInput(
 }
 
 function personaPlaceholder(type: PersonaType) {
-  if (type === "MARRIAGE_YEARS") return "결혼 연차 숫자";
   if (type === "PROFESSION") return "예: 변호사";
-  if (type === "EMPLOYER") return "예: 삼성전자";
-  return "예: 주말마다 함께 등산해요";
+  return "내용을 입력해 주세요";
+}
+
+function personaDisplayValue(persona: Persona) {
+  if (persona.type !== "MARRIAGE_YEARS") return persona.value;
+
+  const marriageYear = parseMarriageYear(persona.normalizedValue);
+  return marriageYear === null ? persona.value : formatMarriageYear(marriageYear);
 }
 
 function providerName(provider: string) {
