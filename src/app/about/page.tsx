@@ -28,13 +28,13 @@ const principles = [
     icon: Scale,
     title: "부부싸움에서도 배우기",
     body:
-      "누가 더 잘못했는지 묻는 일은 때로 필요합니다. 다만 판정의 목적은 망신주기가 아니라 배우기 위함입니다.",
+      "누가 더 잘했고 못했는지 따져보는 것도 때로는 필요합니다. 다만 그 목적은 서로에게 망신을 주려는 것이 아니라, 더 나은 관계를 배우기 위함입니다.",
   },
   {
     icon: ShieldCheck,
     title: "익명과 인증을 함께",
     body:
-      "글과 댓글은 익명으로 쓸 수 있습니다. 다만 원할 때는 확인된 성별과 나이대 같은 페르소나를 공개할 수 있어, 서로 다른 관점에 질문하고 답할 때 참고가 됩니다.",
+      "기본적으로는 익명으로 자유롭게 소통합니다. 필요할 때만 성별이나 연령대 등 최소한의 인증 정보를 선택 공개하여, 서로 다른 관점을 깊이 있게 이해하도록 돕습니다.",
   },
 ];
 
@@ -51,10 +51,9 @@ export default function AboutPage() {
           보통 부부의 하루가 사라지지 않도록
         </h1>
         <p className="mt-6 max-w-3xl text-base leading-8 text-[var(--ink-soft)] md:text-lg">
-          부부라이프는 부부라는 이름으로 살아가는 사람들에게 위로와 희망을
-          전하기 위해 만들었습니다. 잘 살고 있는 부부에게는 배울 수 있는
-          장면을, 다투는 부부에게는 건강하게 싸우고 다시 대화를 시작하는
-          방법을 함께 찾는 커뮤니티입니다.
+          부부라이프는 &apos;부부&apos;라는 이름으로 살아가는 모두에게 위로와
+          희망을 전하는 공간입니다. 잘 살아가는 부부에겐 일상의 지혜를 배우고,
+          다투는 부부에겐 건강하게 화해하는 대화법을 함께 찾아갑니다.
         </p>
       </section>
 
@@ -65,7 +64,7 @@ export default function AboutPage() {
               왜 부부라이프인가
             </p>
             <h2 className="mt-3 font-serif text-3xl font-bold leading-tight">
-              인터넷은 자극에 반응하기 때문에, 보통의 삶은 묻히게 됩니다.
+              자극적인 이야기에 묻혀버린 보통 부부의 일상을 되찾습니다.
             </h2>
           </div>
           <div className="space-y-5 text-sm leading-7 text-[var(--ink-soft)] md:text-base md:leading-8">
@@ -155,7 +154,8 @@ export default function AboutPage() {
             커뮤니티의 약속
           </p>
           <p className="mt-3 max-w-3xl font-serif text-3xl font-bold leading-tight">
-            치우치지 않고 오직 건강한 부부를 바라보고 운영하겠습니다.
+            어느 한쪽으로 치우치지 않고, 오직 &apos;건강한 부부의 삶&apos;만
+            바라봅니다.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link

@@ -13,12 +13,9 @@ export function SiteFooter() {
               <Bot className="size-5 text-[#f7c948]" />
             </div>
             <div>
-              <p className="text-sm font-extrabold">
-                이 사이트의 운영은 AI가 합니다
-              </p>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-white/68">
-                부부라이프는 AI를 활용해 치우치지 않는 커뮤니티 운영을
-                지향합니다.
+              <p className="max-w-2xl text-sm font-extrabold leading-6">
+                부부라이프는 AI 기술을 활용해 편향되지 않고 공정한 커뮤니티
+                환경을 만듭니다.
               </p>
             </div>
           </div>
