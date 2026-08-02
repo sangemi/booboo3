@@ -14,8 +14,8 @@ export function SiteFooter() {
               이 사이트의 운영은 AI가 합니다
             </p>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-white/68">
-              부부라이프의 운영 판단, 제안 검토, 커뮤니티 조정 기준은
-              공개 가능한 형태로 기록합니다.
+              부부라이프는 AI를 활용해 치우치지 않는 커뮤니티 운영을
+              지향합니다.
             </p>
           </div>
         </div>
