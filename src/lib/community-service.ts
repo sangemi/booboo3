@@ -134,6 +134,25 @@ export async function listCommunityPosts() {
   return posts.map(toCommunityPost);
 }
 
+export async function getCommunityPostByPublicId(publicId: number) {
+  if (!Number.isSafeInteger(publicId) || publicId < 1) return null;
+
+  const post = await prisma.post.findUnique({
+    where: { publicId },
+    include: {
+      author: { select: authorSelect },
+      comments: {
+        orderBy: { createdAt: "asc" },
+        include: { author: { select: authorSelect } },
+      },
+      reactions: true,
+      verdictVotes: true,
+    },
+  });
+
+  return post ? toCommunityPost(post) : null;
+}
+
 export async function createCommunityPost(input: {
   category: keyof typeof categoryToDb;
   title: string;
@@ -350,6 +369,7 @@ export async function createTemperatureCheck(input: {
 function toCommunityPost(post: PostWithRelations): CommunityPost {
   return {
     id: post.id,
+    publicId: post.publicId,
     category: categoryFromDb[post.category],
     title: post.title,
     body: post.body,

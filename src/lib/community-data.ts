@@ -11,6 +11,7 @@ export type MoodKey = "warm" | "tired" | "need-talk" | "thankful";
 
 export type CommunityPost = {
   id: string;
+  publicId: number;
   category: Exclude<CategoryKey, "all">;
   title: string;
   body: string;
@@ -169,6 +170,7 @@ export const badges = [
 export const seedPosts: CommunityPost[] = [
   {
     id: "p1",
+    publicId: 1,
     category: "worry",
     title: "퇴근 후 첫 20분이 매번 싸움으로 시작돼요",
     body:
@@ -202,6 +204,7 @@ export const seedPosts: CommunityPost[] = [
   },
   {
     id: "p2",
+    publicId: 2,
     category: "talk",
     title: "오늘 남편이 말없이 도시락통을 씻어놨어요",
     body:
@@ -227,6 +230,7 @@ export const seedPosts: CommunityPost[] = [
   },
   {
     id: "p3",
+    publicId: 3,
     category: "tips",
     title: "집안일 분담표보다 효과 좋았던 건 피로도 점수였어요",
     body:
@@ -252,6 +256,7 @@ export const seedPosts: CommunityPost[] = [
   },
   {
     id: "p4",
+    publicId: 4,
     category: "together",
     title: "만원으로 만든 금요일 집 데이트",
     body:
@@ -269,6 +274,7 @@ export const seedPosts: CommunityPost[] = [
   },
   {
     id: "p5",
+    publicId: 5,
     category: "parenting",
     title: "아이 앞에서 사과하는 모습을 보여줘도 될까요",
     body:

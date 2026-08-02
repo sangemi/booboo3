@@ -49,6 +49,7 @@ async function main() {
   const post = await prisma.post.upsert({
     where: { legacyId: payload.post.id },
     update: {
+      publicId: payload.post.id,
       title: payload.post.title.trim(),
       body: htmlToText(payload.post.content),
       authorName: normalizeAuthor(payload.post.author, "익명의 부부"),
@@ -61,6 +62,7 @@ async function main() {
       updatedAt: new Date(),
     },
     create: {
+      publicId: payload.post.id,
       category: PostCategory.WORRY,
       title: payload.post.title.trim(),
       body: htmlToText(payload.post.content),

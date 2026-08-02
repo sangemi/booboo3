@@ -178,6 +178,8 @@ model VerificationToken {
 
 model Post {
   id                 String        @id @default(cuid())
+  /// Stable public identifier used in /talk/post/:publicId URLs.
+  publicId           Int           @unique @default(autoincrement())
   category           PostCategory
   title              String
   body               String

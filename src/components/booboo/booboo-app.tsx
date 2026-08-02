@@ -15,7 +15,9 @@ import {
   ThumbsUp,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { VerifiedName } from "@/components/booboo/verified-name";
@@ -45,15 +47,26 @@ const verdictOptions: Array<{
   { key: "notEnough", label: "정보 부족", description: "이야기가 더 필요해요" },
 ];
 
-export function BoobooApp() {
+type BoobooAppProps = {
+  initialPost?: CommunityPost;
+};
+
+export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
+  const router = useRouter();
   const { data: session } = useSession();
-  const [posts, setPosts] = useState<CommunityPost[]>(seedPosts);
+  const [posts, setPosts] = useState<CommunityPost[]>(() =>
+    initialPost
+      ? [initialPost, ...seedPosts.filter((post) => post.id !== initialPost.id)]
+      : seedPosts,
+  );
   const [activeCategory, setActiveCategory] = useState<CategoryKey>("all");
   const [query, setQuery] = useState("");
   const [completedMissions, setCompletedMissions] = useState<string[]>([]);
   const [communityLetters, setCommunityLetters] = useState(letters);
-  const [selectedPostId, setSelectedPostId] = useState(seedPosts[0]?.id ?? "");
-  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState(
+    initialPost?.id ?? seedPosts[0]?.id ?? "",
+  );
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(initialPost));
   const [composerOpen, setComposerOpen] = useState(false);
   const [newPost, setNewPost] = useState({
     title: "",
@@ -64,6 +77,7 @@ export function BoobooApp() {
   const [postAsMe, setPostAsMe] = useState(false);
   const [commentAsMe, setCommentAsMe] = useState(false);
   const [letterDraft, setLetterDraft] = useState("");
+  const [postSubmitError, setPostSubmitError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -82,7 +96,10 @@ export function BoobooApp() {
 
         if (!active || !payload.posts?.length) return;
         setPosts(payload.posts);
-        setSelectedPostId(payload.posts[0].id);
+        const requestedPost = initialPost
+          ? payload.posts.find((post) => post.publicId === initialPost.publicId)
+          : undefined;
+        setSelectedPostId(requestedPost?.id ?? payload.posts[0].id);
       } catch {
         return;
       }
@@ -111,7 +128,7 @@ export function BoobooApp() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialPost]);
 
   const filteredPosts = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -140,7 +157,9 @@ export function BoobooApp() {
     selectedPostIndex >= 0 && selectedPostIndex < filteredPosts.length - 1;
 
   useEffect(() => {
-    if (!mobileDetailOpen) return;
+    if (!mobileDetailOpen || !window.matchMedia("(max-width: 1279px)").matches) {
+      return;
+    }
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -150,8 +169,8 @@ export function BoobooApp() {
     };
   }, [mobileDetailOpen]);
 
-  function selectPost(postId: string) {
-    setSelectedPostId(postId);
+  function selectPost(post: CommunityPost) {
+    setSelectedPostId(post.id);
     setMobileDetailOpen(true);
   }
 
@@ -161,7 +180,8 @@ export function BoobooApp() {
     const nextPost = filteredPosts[selectedPostIndex + direction];
     if (!nextPost) return;
 
-    setSelectedPostId(nextPost.id);
+    selectPost(nextPost);
+    router.push(`/talk/post/${nextPost.publicId}`, { scroll: false });
   }
 
   async function reactToPost(
@@ -208,27 +228,7 @@ export function BoobooApp() {
   async function submitPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!newPost.title.trim() || !newPost.body.trim()) return;
-
-    const post: CommunityPost = {
-      id: crypto.randomUUID(),
-      category: newPost.category,
-      title: newPost.title.trim(),
-      body: newPost.body.trim(),
-      author:
-        postAsMe && session?.user?.name ? session.user.name : "익명의 부부",
-      authorVerifiedPersonaCount:
-        postAsMe && session?.user ? session.user.verifiedPersonaCount : 0,
-      coupleStage: "새 이야기",
-      mood: "warm",
-      temperature: 70,
-      createdAt: "방금 전",
-      readMinutes: Math.max(1, Math.ceil(newPost.body.length / 180)),
-      comments: [],
-      reactions: { meToo: 0, hug: 0, saved: 0, helpful: 0 },
-      verdicts: { ...emptyVerdicts },
-      tags: ["새글"],
-      pinned: false,
-    };
+    setPostSubmitError("");
 
     try {
       const response = await fetch("/api/community/posts", {
@@ -243,19 +243,23 @@ export function BoobooApp() {
         }),
       });
 
-      if (response.ok) {
-        const payload = (await response.json()) as { post?: CommunityPost };
-        if (payload.post) {
-          setPosts((current) => [payload.post!, ...current]);
-          setSelectedPostId(payload.post.id);
-        }
-      } else {
-        setPosts((current) => [post, ...current]);
-        setSelectedPostId(post.id);
+      if (!response.ok) {
+        setPostSubmitError("글을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
       }
+
+      const payload = (await response.json()) as { post?: CommunityPost };
+      if (!payload.post) {
+        setPostSubmitError("글을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+
+      setPosts((current) => [payload.post!, ...current]);
+      setSelectedPostId(payload.post.id);
+      router.push(`/talk/post/${payload.post.publicId}`, { scroll: false });
     } catch {
-      setPosts((current) => [post, ...current]);
-      setSelectedPostId(post.id);
+      setPostSubmitError("글을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
     }
 
     setNewPost({ title: "", body: "", category: "talk" });
@@ -537,6 +541,11 @@ export function BoobooApp() {
                   올리기
                 </button>
               </div>
+              {postSubmitError ? (
+                <p role="status" className="mt-3 text-sm font-bold text-[var(--coral)]">
+                  {postSubmitError}
+                </p>
+              ) : null}
             </form>
           ) : null}
 
@@ -546,11 +555,12 @@ export function BoobooApp() {
                 const selected = selectedPost?.id === post.id;
 
                 return (
-                  <article
+                  <Link
                     key={post.id}
-                    onClick={() => selectPost(post.id)}
+                    href={`/talk/post/${post.publicId}`}
+                    onClick={() => selectPost(post)}
                     className={cn(
-                      "cursor-pointer border-b border-[var(--line)] px-3 py-2.5 transition last:border-b-0 hover:bg-[#fbf6f0]",
+                      "block border-b border-[var(--line)] px-3 py-2.5 transition last:border-b-0 hover:bg-[#fbf6f0]",
                       selected ? "bg-[#fbf6f0]" : "bg-white",
                     )}
                   >
@@ -587,7 +597,7 @@ export function BoobooApp() {
                     >
                       {post.title}
                     </h3>
-                  </article>
+                  </Link>
                 );
               })}
             </div>
@@ -855,7 +865,7 @@ export function BoobooApp() {
           <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--line)] bg-[rgba(255,250,246,0.94)] px-3 backdrop-blur">
             <button
               aria-label="글 닫기"
-              onClick={() => setMobileDetailOpen(false)}
+              onClick={() => router.push("/")}
               className="grid size-10 place-items-center rounded-[8px] border border-[var(--line)] bg-white text-[var(--foreground)]"
             >
               <X className="size-5" />
