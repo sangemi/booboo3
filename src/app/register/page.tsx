@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { AuthForm } from "@/components/booboo/auth-form";
+import { SiteFooter } from "@/components/booboo/site-footer";
 import { SiteHeader } from "@/components/booboo/site-header";
 
 export default function RegisterPage() {
@@ -20,6 +21,7 @@ export default function RegisterPage() {
           />
         </Suspense>
       </main>
+      <SiteFooter />
     </>
   );
 }

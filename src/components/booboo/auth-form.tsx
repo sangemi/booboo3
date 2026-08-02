@@ -6,7 +6,12 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { type Resolver, useForm, useWatch } from "react-hook-form";
+import {
+  type Resolver,
+  type UseFormRegisterReturn,
+  useForm,
+  useWatch,
+} from "react-hook-form";
 import { z } from "zod";
 
 type AuthFormProps = {
@@ -35,12 +40,24 @@ const registerSchema = loginSchema.extend({
     .min(8, "비밀번호는 8자 이상 입력해 주세요.")
     .max(72, "비밀번호는 72자까지 쓸 수 있어요."),
   gender: z.enum(["남성", "여성"]).optional(),
+  ageConfirmed: z.literal(true, {
+    error: "만 14세 이상임을 확인해 주세요.",
+  }),
+  termsAccepted: z.literal(true, {
+    error: "이용약관에 동의해 주세요.",
+  }),
+  privacyAccepted: z.literal(true, {
+    error: "개인정보 수집·이용에 동의해 주세요.",
+  }),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
 type AuthValues = LoginForm & {
   nickname: string;
   gender?: "남성" | "여성";
+  ageConfirmed: boolean;
+  termsAccepted: boolean;
+  privacyAccepted: boolean;
 };
 
 export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
@@ -58,8 +75,24 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
   const form = useForm<AuthValues>({
     resolver: zodResolver(schema) as unknown as Resolver<AuthValues>,
     defaultValues: isRegister
-      ? { nickname: "", email: "", password: "", gender: undefined }
-      : { nickname: "", email: "", password: "", gender: undefined },
+      ? {
+          nickname: "",
+          email: "",
+          password: "",
+          gender: undefined,
+          ageConfirmed: false,
+          termsAccepted: false,
+          privacyAccepted: false,
+        }
+      : {
+          nickname: "",
+          email: "",
+          password: "",
+          gender: undefined,
+          ageConfirmed: false,
+          termsAccepted: false,
+          privacyAccepted: false,
+        },
   });
   const selectedGender = useWatch({ control: form.control, name: "gender" });
 
@@ -111,6 +144,16 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
   }
 
   async function socialLogin(provider: "google" | "kakao") {
+    if (
+      isRegister &&
+      (!form.getValues("ageConfirmed") ||
+        !form.getValues("termsAccepted") ||
+        !form.getValues("privacyAccepted"))
+    ) {
+      setError("필수 확인과 동의를 마친 뒤 계속해 주세요.");
+      return;
+    }
+
     const enabled = provider === "google" ? googleEnabled : kakaoEnabled;
     if (!enabled) {
       setError(`현재 ${provider === "google" ? "Google" : "카카오"} 로그인을 사용할 수 없습니다.`);
@@ -126,6 +169,11 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
   const passwordError = form.formState.errors.password?.message;
   const nicknameError = isRegister
     ? form.formState.errors.nickname?.message
+    : undefined;
+  const agreementError = isRegister
+    ? form.formState.errors.ageConfirmed?.message ||
+      form.formState.errors.termsAccepted?.message ||
+      form.formState.errors.privacyAccepted?.message
     : undefined;
 
   return (
@@ -143,6 +191,29 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
             : "내가 쓴 이야기와 페르소나를 이어서 관리하세요."}
         </p>
       </div>
+
+      {isRegister ? (
+        <fieldset className="mb-6 space-y-2 border-y border-[var(--line)] py-4">
+          <legend className="sr-only">필수 확인과 동의</legend>
+          <AgreementCheckbox
+            label="만 14세 이상입니다"
+            registration={form.register("ageConfirmed")}
+          />
+          <AgreementCheckbox
+            label="이용약관에 동의합니다"
+            href="/company/terms"
+            registration={form.register("termsAccepted")}
+          />
+          <AgreementCheckbox
+            label="개인정보 수집·이용에 동의합니다"
+            href="/company/privacy-collect"
+            registration={form.register("privacyAccepted")}
+          />
+          {agreementError ? (
+            <p className="pt-1 text-xs text-[#a33c32]">{agreementError}</p>
+          ) : null}
+        </fieldset>
+      ) : null}
 
       <div className="grid gap-2.5">
         <button
@@ -172,6 +243,18 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
           카카오로 계속하기
         </button>
       </div>
+
+      <p className="mt-3 text-xs leading-5 text-[var(--ink-soft)]">
+        소셜 계정으로 처음 가입하는 경우 부부라이프의{" "}
+        <Link href="/company/terms" target="_blank" className="font-bold underline">
+          이용약관
+        </Link>
+        과{" "}
+        <Link href="/company/privacy" target="_blank" className="font-bold underline">
+          개인정보처리방침
+        </Link>
+        을 확인해 주세요.
+      </p>
 
       <div className="my-6 flex items-center gap-3 text-xs text-[var(--ink-soft)]">
         <span className="h-px flex-1 bg-[var(--line)]" />
@@ -277,6 +360,40 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
           {isRegister ? "로그인" : "회원가입"}
         </Link>
       </p>
+
+    </div>
+  );
+}
+
+function AgreementCheckbox({
+  label,
+  href,
+  registration,
+}: {
+  label: string;
+  href?: string;
+  registration: UseFormRegisterReturn;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 text-sm text-[var(--foreground)]">
+      <label className="flex min-w-0 flex-1 items-center gap-2.5">
+        <input
+          {...registration}
+          type="checkbox"
+          className="size-4 shrink-0 accent-[var(--plum)]"
+        />
+        <span>[필수] {label}</span>
+      </label>
+      {href ? (
+        <Link
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 text-xs font-bold text-[var(--plum)] underline"
+        >
+          보기
+        </Link>
+      ) : null}
     </div>
   );
 }

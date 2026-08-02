@@ -10,7 +10,7 @@ import { VerifiedName } from "@/components/booboo/verified-name";
 import { cn } from "@/lib/utils";
 
 type SiteHeaderProps = {
-  active: "about" | "community";
+  active: "about" | "community" | "company";
   query?: string;
   onQueryChange?: (value: string) => void;
   onWriteClick?: () => void;

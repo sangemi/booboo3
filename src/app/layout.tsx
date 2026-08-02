@@ -18,6 +18,7 @@ const gowunBatang = Gowun_Batang({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://booboolife.com"),
   title: "부부라이프 | 우리 부부 이야기",
   description:
     "결혼생활, 부부소통, 육아, 데이트 이야기를 나누는 따뜻한 커뮤니티",
