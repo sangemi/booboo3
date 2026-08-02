@@ -3,6 +3,8 @@
 import {
   Bookmark,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Flame,
   Heart,
   Home,
@@ -12,6 +14,7 @@ import {
   Smile,
   Sparkles,
   ThumbsUp,
+  X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -63,6 +66,7 @@ export function BoobooApp() {
   const [completedMissions, setCompletedMissions] = useState<string[]>([]);
   const [communityLetters, setCommunityLetters] = useState(letters);
   const [selectedPostId, setSelectedPostId] = useState(seedPosts[0]?.id ?? "");
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [newPost, setNewPost] = useState({
     title: "",
@@ -139,6 +143,37 @@ export function BoobooApp() {
 
   const selectedPost =
     posts.find((post) => post.id === selectedPostId) ?? filteredPosts[0] ?? posts[0];
+  const selectedPostIndex = selectedPost
+    ? filteredPosts.findIndex((post) => post.id === selectedPost.id)
+    : -1;
+  const canGoPrevious = selectedPostIndex > 0;
+  const canGoNext =
+    selectedPostIndex >= 0 && selectedPostIndex < filteredPosts.length - 1;
+
+  useEffect(() => {
+    if (!mobileDetailOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [mobileDetailOpen]);
+
+  function selectPost(postId: string) {
+    setSelectedPostId(postId);
+    setMobileDetailOpen(true);
+  }
+
+  function moveSelectedPost(direction: -1 | 1) {
+    if (selectedPostIndex < 0) return;
+
+    const nextPost = filteredPosts[selectedPostIndex + direction];
+    if (!nextPost) return;
+
+    setSelectedPostId(nextPost.id);
+  }
 
   async function reactToPost(
     postId: string,
@@ -488,7 +523,7 @@ export function BoobooApp() {
               {filteredPosts.map((post) => (
                 <article
                   key={post.id}
-                  onClick={() => setSelectedPostId(post.id)}
+                  onClick={() => selectPost(post.id)}
                   className={cn(
                     "cursor-pointer rounded-[8px] border bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(75,54,38,0.1)]",
                     selectedPost?.id === post.id
@@ -501,7 +536,7 @@ export function BoobooApp() {
                       {categoryLabels[post.category]}
                     </span>
                     <span className="text-xs text-[var(--ink-soft)]">
-                      {post.createdAt} · {post.readMinutes}분
+                      {post.createdAt}
                     </span>
                     {post.pinned ? (
                       <span className="rounded-[6px] bg-[#fff4bf] px-2 py-1 text-xs font-bold text-[#7a5b00]">
@@ -539,7 +574,7 @@ export function BoobooApp() {
             </div>
 
             {selectedPost ? (
-              <article className="rounded-[8px] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(75,54,38,0.08)] xl:sticky xl:top-4 xl:self-start">
+              <article className="hidden rounded-[8px] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(75,54,38,0.08)] xl:sticky xl:top-4 xl:block xl:self-start">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
                     {categoryLabels[selectedPost.category]}
@@ -774,6 +809,55 @@ export function BoobooApp() {
           </section>
         </aside>
       </section>
+
+      {selectedPost && mobileDetailOpen ? (
+        <section className="fixed inset-0 z-50 flex flex-col bg-[var(--background)] xl:hidden">
+          <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--line)] bg-[rgba(255,250,246,0.94)] px-3 backdrop-blur">
+            <button
+              aria-label="글 닫기"
+              onClick={() => setMobileDetailOpen(false)}
+              className="grid size-10 place-items-center rounded-[8px] border border-[var(--line)] bg-white text-[var(--foreground)]"
+            >
+              <X className="size-5" />
+            </button>
+            <p className="text-sm font-extrabold">글 보기</p>
+            <div className="flex items-center gap-1">
+              <button
+                aria-label="이전 글"
+                disabled={!canGoPrevious}
+                onClick={() => moveSelectedPost(-1)}
+                className="grid size-10 place-items-center rounded-[8px] border border-[var(--line)] bg-white text-[var(--foreground)] disabled:opacity-32"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <button
+                aria-label="다음 글"
+                disabled={!canGoNext}
+                onClick={() => moveSelectedPost(1)}
+                className="grid size-10 place-items-center rounded-[8px] border border-[var(--line)] bg-white text-[var(--foreground)] disabled:opacity-32"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+            </div>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            <MobilePostDetail
+              post={selectedPost}
+              commentDraft={commentDrafts[selectedPost.id] ?? ""}
+              onCommentDraftChange={(value) =>
+                setCommentDrafts((current) => ({
+                  ...current,
+                  [selectedPost.id]: value,
+                }))
+              }
+              onSubmitComment={(event) => submitComment(selectedPost.id, event)}
+              onReact={(type) => reactToPost(selectedPost.id, type)}
+              onVerdict={(choice) => voteVerdict(selectedPost.id, choice)}
+            />
+          </div>
+        </section>
+      ) : null}
+
       <SiteFooter />
     </main>
   );
@@ -784,6 +868,150 @@ function visibleCategoryForPost(
 ): Exclude<CategoryKey, "all"> {
   if (category === "tips" || category === "together") return "tips";
   return "talk";
+}
+
+function MobilePostDetail({
+  post,
+  commentDraft,
+  onCommentDraftChange,
+  onSubmitComment,
+  onReact,
+  onVerdict,
+}: {
+  post: CommunityPost;
+  commentDraft: string;
+  onCommentDraftChange: (value: string) => void;
+  onSubmitComment: (event: FormEvent<HTMLFormElement>) => void;
+  onReact: (type: keyof CommunityPost["reactions"]) => void;
+  onVerdict: (choice: keyof VerdictState) => void;
+}) {
+  return (
+    <article className="rounded-[8px] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(75,54,38,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
+          {categoryLabels[post.category]}
+        </span>
+        <span className="text-xs font-bold text-[var(--ink-soft)]">
+          따뜻한 댓글 바래요
+        </span>
+      </div>
+      <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
+        {post.title}
+      </h3>
+      <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">{post.body}</p>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {post.tags.map((tag) => (
+          <span
+            key={tag}
+            className="rounded-[6px] border border-[var(--line)] px-2 py-1 text-xs font-bold text-[var(--ink-soft)]"
+          >
+            #{tag}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-2">
+        <ReactionButton
+          icon={Heart}
+          label="나도 그래요"
+          value={post.reactions.meToo}
+          onClick={() => onReact("meToo")}
+        />
+        <ReactionButton
+          icon={Smile}
+          label="응원해요"
+          value={post.reactions.hug}
+          onClick={() => onReact("hug")}
+        />
+        <ReactionButton
+          icon={Bookmark}
+          label="저장"
+          value={post.reactions.saved}
+          onClick={() => onReact("saved")}
+        />
+        <ReactionButton
+          icon={ThumbsUp}
+          label="도움돼요"
+          value={post.reactions.helpful}
+          onClick={() => onReact("helpful")}
+        />
+      </div>
+
+      <section className="mt-5 rounded-[8px] border border-[var(--line)] bg-[#fbf6f0] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-sm font-extrabold">누가 더 잘못했나요?</h4>
+          <span className="text-xs font-bold text-[var(--ink-soft)]">
+            총{" "}
+            {Object.values(post.verdicts ?? emptyVerdicts).reduce(
+              (sum, count) => sum + count,
+              0,
+            )}
+            표
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {verdictOptions.map((option) => {
+            const value = (post.verdicts ?? emptyVerdicts)[option.key] ?? 0;
+
+            return (
+              <button
+                key={option.key}
+                onClick={() => onVerdict(option.key)}
+                className="rounded-[8px] border border-[var(--line)] bg-white p-3 text-left transition hover:border-[var(--plum)] hover:bg-white"
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <strong className="text-sm">{option.label}</strong>
+                  <span className="font-serif text-xl font-bold">{value}</span>
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-[var(--ink-soft)]">
+                  {option.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="mt-6 border-t border-[var(--line)] pt-5">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-extrabold">댓글 {post.comments.length}</h4>
+          <span className="text-xs text-[var(--ink-soft)]">
+            따뜻한 댓글 바래요
+          </span>
+        </div>
+        <div className="mt-3 space-y-3">
+          {post.comments.map((comment) => (
+            <div key={comment.id} className="rounded-[8px] bg-[#fbf6f0] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <strong className="text-sm">{comment.author}</strong>
+                <span className="text-xs text-[var(--ink-soft)]">
+                  {comment.createdAt}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+                {comment.body}
+              </p>
+            </div>
+          ))}
+        </div>
+        <form onSubmit={onSubmitComment} className="mt-3 flex gap-2">
+          <input
+            value={commentDraft}
+            onChange={(event) => onCommentDraftChange(event.target.value)}
+            className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
+            placeholder="따뜻한 댓글 남기기"
+          />
+          <button
+            aria-label="댓글 등록"
+            className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white"
+          >
+            <Send className="size-4" />
+          </button>
+        </form>
+      </div>
+    </article>
+  );
 }
 
 function ReactionButton({
