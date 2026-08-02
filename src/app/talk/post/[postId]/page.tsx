@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { BoobooApp } from "@/components/booboo/booboo-app";
+import type { CategoryKey } from "@/lib/community-data";
 import { getCommunityPostByPublicId } from "@/lib/community-service";
 
 type PostPageProps = {
   params: Promise<{ postId: string }>;
+  searchParams: Promise<{ category?: string | string[] }>;
 };
 
 export async function generateMetadata({
@@ -29,11 +31,22 @@ export async function generateMetadata({
   };
 }
 
-export default async function PostPage({ params }: PostPageProps) {
+export default async function PostPage({ params, searchParams }: PostPageProps) {
   const { postId } = await params;
+  const { category } = await searchParams;
   const post = await getCommunityPostByPublicId(Number(postId));
 
   if (!post) notFound();
 
-  return <BoobooApp initialPost={post} />;
+  return (
+    <BoobooApp
+      initialPost={post}
+      initialCategory={normalizeCategory(category)}
+    />
+  );
+}
+
+function normalizeCategory(value?: string | string[]): CategoryKey {
+  const category = Array.isArray(value) ? value[0] : value;
+  return category === "talk" || category === "tips" ? category : "all";
 }

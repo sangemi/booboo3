@@ -27,6 +27,7 @@ import {
   CategoryKey,
   CommunityPost,
   emptyVerdicts,
+  Letter,
   letters,
   missions,
   seedPosts,
@@ -49,9 +50,10 @@ const verdictOptions: Array<{
 
 type BoobooAppProps = {
   initialPost?: CommunityPost;
+  initialCategory?: CategoryKey;
 };
 
-export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
+export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {}) {
   const router = useRouter();
   const { data: session } = useSession();
   const [posts, setPosts] = useState<CommunityPost[]>(() =>
@@ -59,7 +61,9 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
       ? [initialPost, ...seedPosts.filter((post) => post.id !== initialPost.id)]
       : seedPosts,
   );
-  const [activeCategory, setActiveCategory] = useState<CategoryKey>("all");
+  const [activeCategory, setActiveCategory] = useState<CategoryKey>(
+    initialCategory ?? "all",
+  );
   const [query, setQuery] = useState("");
   const [completedMissions, setCompletedMissions] = useState<string[]>([]);
   const [communityLetters, setCommunityLetters] = useState(letters);
@@ -77,6 +81,7 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
   const [postAsMe, setPostAsMe] = useState(false);
   const [commentAsMe, setCommentAsMe] = useState(false);
   const [letterDraft, setLetterDraft] = useState("");
+  const [letterTone, setLetterTone] = useState<Letter["tone"] | null>(null);
   const [postSubmitError, setPostSubmitError] = useState("");
 
   useEffect(() => {
@@ -174,6 +179,12 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
     setMobileDetailOpen(true);
   }
 
+  function postHref(publicId: number) {
+    const categoryQuery =
+      activeCategory === "all" ? "" : `?category=${activeCategory}`;
+    return `/talk/post/${publicId}${categoryQuery}`;
+  }
+
   function moveSelectedPost(direction: -1 | 1) {
     if (selectedPostIndex < 0) return;
 
@@ -181,7 +192,7 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
     if (!nextPost) return;
 
     selectPost(nextPost);
-    router.push(`/talk/post/${nextPost.publicId}`, { scroll: false });
+    router.push(postHref(nextPost.publicId), { scroll: false });
   }
 
   async function reactToPost(
@@ -256,7 +267,7 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
 
       setPosts((current) => [payload.post!, ...current]);
       setSelectedPostId(payload.post.id);
-      router.push(`/talk/post/${payload.post.publicId}`, { scroll: false });
+      router.push(postHref(payload.post.publicId), { scroll: false });
     } catch {
       setPostSubmitError("글을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return;
@@ -386,7 +397,7 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
 
   async function submitLetter() {
     const body = letterDraft.trim();
-    if (!body) return;
+    if (!body || !letterTone) return;
 
     const title = body.split(/\r?\n/)[0]?.slice(0, 44) || "차마 못 한 말";
 
@@ -394,7 +405,7 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
       const response = await fetch("/api/community/letters", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, body, tone: "서운함" }),
+        body: JSON.stringify({ title, body, tone: letterTone }),
       });
       if (!response.ok) return;
 
@@ -405,6 +416,7 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
 
       setCommunityLetters((current) => [payload.letter!, ...current]);
       setLetterDraft("");
+      setLetterTone(null);
     } catch {
       return;
     }
@@ -557,7 +569,7 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
                 return (
                   <Link
                     key={post.id}
-                    href={`/talk/post/${post.publicId}`}
+                    href={postHref(post.publicId)}
                     onClick={() => selectPost(post)}
                     className={cn(
                       "block border-b border-[var(--line)] px-3 py-2.5 transition last:border-b-0 hover:bg-[#fbf6f0]",
@@ -604,12 +616,9 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
 
             {selectedPost ? (
               <article className="hidden rounded-[8px] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(75,54,38,0.08)] xl:sticky xl:top-4 xl:block xl:self-start">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
                     {categoryLabels[selectedPost.category]}
-                  </span>
-                  <span className="text-xs font-bold text-[var(--ink-soft)]">
-                    따뜻한 댓글 바래요
                   </span>
                 </div>
                 <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
@@ -622,7 +631,7 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
                     compact
                   />
                 </div>
-                <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">
+                <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[var(--ink-soft)]">
                   {selectedPost.body}
                 </p>
 
@@ -844,6 +853,24 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
                 </div>
               ))}
             </div>
+            <div className="mt-3 grid grid-cols-3 gap-1 rounded-[8px] bg-white/72 p-1">
+              {(["고마움", "미안함", "서운함"] as const).map((tone) => (
+                <button
+                  key={tone}
+                  type="button"
+                  aria-pressed={letterTone === tone}
+                  onClick={() => setLetterTone(tone)}
+                  className={cn(
+                    "h-9 rounded-[6px] text-xs font-bold transition",
+                    letterTone === tone
+                      ? "bg-[#7a5b00] text-white"
+                      : "text-[#7a5b00] hover:bg-[#fff0b5]",
+                  )}
+                >
+                  {tone}
+                </button>
+              ))}
+            </div>
             <textarea
               value={letterDraft}
               onChange={(event) => setLetterDraft(event.target.value)}
@@ -852,7 +879,8 @@ export function BoobooApp({ initialPost }: BoobooAppProps = {}) {
             />
             <button
               onClick={submitLetter}
-              className="mt-2 h-10 w-full rounded-[8px] bg-[#7a5b00] text-sm font-bold text-white"
+              disabled={!letterDraft.trim() || !letterTone}
+              className="mt-2 h-10 w-full rounded-[8px] bg-[#7a5b00] text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
               익명으로 접어두기
             </button>
@@ -946,12 +974,9 @@ function MobilePostDetail({
 }) {
   return (
     <article className="rounded-[8px] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(75,54,38,0.08)]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
           {categoryLabels[post.category]}
-        </span>
-        <span className="text-xs font-bold text-[var(--ink-soft)]">
-          따뜻한 댓글 바래요
         </span>
       </div>
       <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
@@ -964,7 +989,9 @@ function MobilePostDetail({
           compact
         />
       </div>
-      <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">{post.body}</p>
+      <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[var(--ink-soft)]">
+        {post.body}
+      </p>
 
       <div className="mt-5 flex flex-wrap gap-2">
         {post.tags.map((tag) => (

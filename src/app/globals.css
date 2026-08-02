@@ -40,7 +40,6 @@ a,
 button {
   overflow-wrap: break-word;
   text-wrap: pretty;
-  white-space: normal;
   word-break: keep-all;
 }
 
