@@ -72,7 +72,7 @@ export const categories: Array<{
 }> = [
   { key: "all", label: "전체", description: "지금 오가는 모든 이야기" },
   { key: "talk", label: "부부톡", description: "오늘 집에서 생긴 진짜 이야기" },
-  { key: "tips", label: "생활팁", description: "싸움을 줄이는 작은 방법" },
+  { key: "tips", label: "생활 팁", description: "싸움을 줄이는 작은 방법" },
   // 보류: 한 게시판이 제대로 활성화되면 다시 열 후보입니다.
   // { key: "worry", label: "고민상담", description: "소통, 돈, 가족, 갈등" },
   // { key: "parenting", label: "육아톡", description: "아이와 함께 사는 리듬" },
@@ -86,9 +86,9 @@ export const categoryLabels: Record<CategoryKey, string> = {
   all: "전체",
   talk: "부부톡",
   worry: "부부톡",
-  tips: "생활팁",
+  tips: "생활 팁",
   parenting: "부부톡",
-  together: "생활팁",
+  together: "생활 팁",
   letters: "부부톡",
 };
 

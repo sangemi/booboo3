@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Flame,
   Heart,
-  Home,
   Lock,
   MessageCircle,
   Send,
@@ -33,14 +32,6 @@ import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/booboo/site-footer";
 import { SiteHeader } from "@/components/booboo/site-header";
 
-const categoryIcons: Partial<
-  Record<CategoryKey, React.ComponentType<{ className?: string }>>
-> = {
-  all: Home,
-  talk: MessageCircle,
-  tips: Sparkles,
-};
-
 const verdictOptions: Array<{
   key: keyof VerdictState;
   label: string;
@@ -51,13 +42,6 @@ const verdictOptions: Array<{
   { key: "both", label: "둘 다", description: "둘 다 돌아볼 부분이 있어요" },
   { key: "notEnough", label: "정보 부족", description: "이야기가 더 필요해요" },
 ];
-
-const moodLabels = {
-  warm: "따뜻함",
-  tired: "지침",
-  "need-talk": "대화 필요",
-  thankful: "고마움",
-};
 
 export function BoobooApp() {
   const [posts, setPosts] = useState<CommunityPost[]>(seedPosts);
@@ -410,11 +394,24 @@ export function BoobooApp() {
         onWriteClick={() => setComposerOpen((value) => !value)}
       />
 
-      <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 md:px-8 lg:grid-cols-[240px_minmax(0,1fr)_360px]">
-        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <nav className="rounded-[8px] border border-[var(--line)] bg-[var(--paper)] p-2">
+      <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 md:px-8 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_280px]">
+        <section className="min-w-0 space-y-4">
+          <div className="rounded-[8px] border border-[var(--line)] bg-[var(--paper)] px-4 py-3 md:px-5">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-6 md:text-base">
+              <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 text-[11px] font-bold text-[var(--plum)]">
+                <Sparkles className="size-3.5" />
+                목표
+              </span>
+              {" "}
+              <span>
+                행복한 부부는 더 배우고 나누고, 다투는 부부는 건강하게 싸우는
+                연습을
+              </span>
+            </p>
+          </div>
+
+          <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[var(--line)] bg-[var(--paper)] p-1">
             {categories.map((category) => {
-              const Icon = categoryIcons[category.key] ?? MessageCircle;
               const active = activeCategory === category.key;
 
               return (
@@ -422,45 +419,17 @@ export function BoobooApp() {
                   key={category.key}
                   onClick={() => setActiveCategory(category.key)}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-[6px] px-3 py-3 text-left transition",
+                    "h-10 shrink-0 rounded-[6px] px-4 text-sm font-bold transition",
                     active
                       ? "bg-[var(--plum)] text-white"
-                      : "text-[var(--foreground)] hover:bg-[#f7eee7]",
+                      : "text-[var(--ink-soft)] hover:bg-[#f7eee7] hover:text-[var(--foreground)]",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold">{category.label}</span>
-                    <span
-                      className={cn(
-                        "block truncate text-xs",
-                        active ? "text-white/72" : "text-[var(--ink-soft)]",
-                      )}
-                    >
-                      {category.description}
-                    </span>
-                  </span>
+                  {category.label}
                 </button>
               );
             })}
           </nav>
-        </aside>
-
-        <section className="min-w-0 space-y-4">
-          <div className="rounded-[8px] border border-[var(--line)] bg-[var(--paper)] px-4 py-3 md:px-5">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <p className="inline-flex items-center gap-2 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 text-[11px] font-bold text-[var(--plum)]">
-                  <Sparkles className="size-3.5" />
-                  목표
-                </p>
-                <p className="mt-2 text-sm leading-6 md:text-base">
-                  행복한 부부는 더 배우고 나누고, 다투는 부부는 건강하게 싸우는
-                  연습을.
-                </p>
-              </div>
-            </div>
-          </div>
 
           {composerOpen ? (
             <form
@@ -518,45 +487,32 @@ export function BoobooApp() {
             </form>
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.68fr)]">
-            <div className="space-y-3">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
               {filteredPosts.map((post) => (
                 <article
                   key={post.id}
                   onClick={() => selectPost(post.id)}
                   className={cn(
-                    "cursor-pointer rounded-[8px] border bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(75,54,38,0.1)]",
+                    "cursor-pointer border-b border-[var(--line)] px-4 py-3 transition last:border-b-0 hover:bg-[#fbf6f0]",
                     selectedPost?.id === post.id
-                      ? "border-[var(--plum)]"
-                      : "border-[var(--line)]",
+                      ? "bg-[#fbf6f0]"
+                      : "bg-white",
                   )}
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
-                      {categoryLabels[post.category]}
-                    </span>
-                    <span className="text-xs text-[var(--ink-soft)]">
-                      {post.createdAt}
-                    </span>
-                    {post.pinned ? (
-                      <span className="rounded-[6px] bg-[#fff4bf] px-2 py-1 text-xs font-bold text-[#7a5b00]">
-                        주목
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
+                        {categoryLabels[post.category]}
                       </span>
-                    ) : null}
-                  </div>
-                  <h3 className="mt-3 text-lg font-extrabold leading-snug">
-                    {post.title}
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--ink-soft)]">
-                    {post.body}
-                  </p>
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-xs text-[var(--ink-soft)]">
-                      <span className="font-bold text-[var(--foreground)]">
-                        {post.author}
+                      <span className="text-xs text-[var(--ink-soft)]">
+                        {post.createdAt}
                       </span>
-                      <span>{post.coupleStage}</span>
-                      <span>{moodLabels[post.mood]}</span>
+                      {post.pinned ? (
+                        <span className="rounded-[6px] bg-[#fff4bf] px-2 py-1 text-xs font-bold text-[#7a5b00]">
+                          주목
+                        </span>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2 text-xs font-bold">
                       <span className="inline-flex items-center gap-1 text-[var(--coral)]">
@@ -569,6 +525,9 @@ export function BoobooApp() {
                       </span>
                     </div>
                   </div>
+                  <h3 className="mt-2 text-base font-extrabold leading-snug md:text-lg">
+                    {post.title}
+                  </h3>
                 </article>
               ))}
             </div>
