@@ -696,5 +696,6 @@ function relativeTime(date: Date) {
   return date.toLocaleDateString("ko-KR", {
     month: "long",
     day: "numeric",
+    timeZone: "Asia/Seoul",
   });
 }
