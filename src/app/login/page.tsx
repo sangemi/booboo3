@@ -4,6 +4,8 @@ import { AuthForm } from "@/components/booboo/auth-form";
 import { SiteFooter } from "@/components/booboo/site-footer";
 import { SiteHeader } from "@/components/booboo/site-header";
 
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
   return (
     <>
