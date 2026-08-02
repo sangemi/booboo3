@@ -51,30 +51,46 @@ const verdictOptions: Array<{
 
 type BoobooAppProps = {
   initialPost?: CommunityPost;
+  initialPosts?: CommunityPost[];
+  initialLetters?: Letter[];
+  initialMission?: Mission;
   initialCategory?: CategoryKey;
 };
 
-export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {}) {
+export function BoobooApp({
+  initialPost,
+  initialPosts,
+  initialLetters,
+  initialMission,
+  initialCategory,
+}: BoobooAppProps = {}) {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const [posts, setPosts] = useState<CommunityPost[]>(() =>
-    initialPost
-      ? [initialPost, ...seedPosts.filter((post) => post.id !== initialPost.id)]
-      : seedPosts,
+    initialPosts !== undefined
+      ? initialPosts
+      : initialPost
+        ? [initialPost, ...seedPosts.filter((post) => post.id !== initialPost.id)]
+        : seedPosts,
   );
   const [activeCategory, setActiveCategory] = useState<CategoryKey>(
     initialCategory ?? "all",
   );
   const [query, setQuery] = useState("");
   const [todayMission, setTodayMission] = useState<Mission>(
-    () => dailyMissionSelection().mission,
+    () => initialMission ?? dailyMissionSelection().mission,
   );
   const [missionOpen, setMissionOpen] = useState(false);
   const [missionReflectionDraft, setMissionReflectionDraft] = useState("");
   const [pendingMissionAction, setPendingMissionAction] = useState(false);
-  const [communityLetters, setCommunityLetters] = useState(letters);
+  const [communityLetters, setCommunityLetters] = useState(
+    initialLetters !== undefined ? initialLetters : letters,
+  );
   const [selectedPostId, setSelectedPostId] = useState(
-    initialPost?.id ?? seedPosts[0]?.id ?? "",
+    initialPost?.id ??
+      initialPosts?.[0]?.id ??
+      (initialPosts === undefined ? seedPosts[0]?.id : "") ??
+      "",
   );
   const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(initialPost));
   const [composerOpen, setComposerOpen] = useState(false);
@@ -84,6 +100,9 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     category: "talk" as Exclude<CategoryKey, "all">,
   });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentSubmitErrors, setCommentSubmitErrors] = useState<
+    Record<string, string>
+  >({});
   const [postAsMe, setPostAsMe] = useState(false);
   const [commentAsMe, setCommentAsMe] = useState(false);
   const [letterDraft, setLetterDraft] = useState("");
@@ -106,12 +125,17 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
           source?: "seed" | "database";
         };
 
-        if (!active || !payload.posts?.length) return;
-        setPosts(payload.posts);
+        if (!active || !payload.posts) return;
+        const nextPosts =
+          initialPost &&
+          !payload.posts.some((post) => post.publicId === initialPost.publicId)
+            ? [initialPost, ...payload.posts]
+            : payload.posts;
+        setPosts(nextPosts);
         const requestedPost = initialPost
-          ? payload.posts.find((post) => post.publicId === initialPost.publicId)
+          ? nextPosts.find((post) => post.publicId === initialPost.publicId)
           : undefined;
-        setSelectedPostId(requestedPost?.id ?? payload.posts[0].id);
+        setSelectedPostId(requestedPost?.id ?? nextPosts[0]?.id ?? "");
       } catch {
         return;
       }
@@ -127,7 +151,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
         const payload = (await response.json()) as {
           letters?: typeof letters;
         };
-        if (!active || !payload.letters?.length) return;
+        if (!active || !payload.letters) return;
         setCommunityLetters(payload.letters);
       } catch {
         return;
@@ -244,8 +268,15 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     return `/talk/post/${publicId}${categoryQuery}`;
   }
 
+  function homeHref(category: CategoryKey) {
+    return category === "all" ? "/" : `/?category=${category}`;
+  }
+
   function selectCategory(category: CategoryKey) {
     setActiveCategory(category);
+    if (!initialPost) {
+      router.replace(homeHref(category), { scroll: false });
+    }
     if (category !== "all") {
       setNewPost((current) => ({ ...current, category }));
     }
@@ -390,6 +421,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     event.preventDefault();
     const draft = commentDrafts[postId]?.trim();
     if (!draft) return;
+    setCommentSubmitErrors((current) => ({ ...current, [postId]: "" }));
 
     try {
       const response = await fetch(`/api/community/posts/${postId}/comments`, {
@@ -419,36 +451,13 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
         }
       }
     } catch {
-      // Keep the optimistic local comment when the network write fails.
+      // The error below keeps unsaved comments from looking published.
     }
-
-    setPosts((current) =>
-      current.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              comments: [
-                ...post.comments,
-                {
-                  id: crypto.randomUUID(),
-                  author:
-                    commentAsMe && session?.user?.name
-                      ? session.user.name
-                      : "방문자",
-                  authorVerifiedPersonaCount:
-                    commentAsMe && session?.user
-                      ? session.user.verifiedPersonaCount
-                      : 0,
-                  body: draft,
-                  tone: "support",
-                  createdAt: "방금 전",
-                },
-              ],
-            }
-          : post,
-      ),
-    );
-    setCommentDrafts((current) => ({ ...current, [postId]: "" }));
+    setCommentSubmitErrors((current) => ({
+      ...current,
+      [postId]:
+        "댓글을 저장하지 못했습니다. 작성한 내용은 그대로 두었으니 다시 시도해 주세요.",
+    }));
   }
 
   async function participateInMission() {
@@ -596,7 +605,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
             </p>
           </div>
 
-          <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[var(--line)] bg-[var(--paper)] p-1">
+          <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[var(--line)] bg-[var(--paper)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {categories.map((category) => {
               const active = activeCategory === category.key;
 
@@ -607,7 +616,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
                   aria-pressed={active}
                   onClick={() => selectCategory(category.key)}
                   className={cn(
-                    "h-10 shrink-0 rounded-[6px] px-4 text-sm font-bold transition",
+                    "h-10 shrink-0 rounded-[6px] px-3 text-sm font-bold transition sm:px-4",
                     active
                       ? "bg-[var(--plum)] text-white"
                       : "text-[var(--ink-soft)] hover:bg-[#f7eee7] hover:text-[var(--foreground)]",
@@ -715,9 +724,22 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
           <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
             <div className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
               {filteredPosts.length === 0 ? (
-                <p className="px-4 py-10 text-center text-sm text-[var(--ink-soft)]">
-                  아직 올라온 글이 없습니다.
-                </p>
+                <div className="px-4 py-10 text-center">
+                  <p className="text-sm text-[var(--ink-soft)]">
+                    {query.trim()
+                      ? `"${query.trim()}"에 맞는 글을 찾지 못했습니다.`
+                      : "이 게시판에는 아직 글이 없습니다."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      query.trim() ? setQuery("") : setComposerOpen(true)
+                    }
+                    className="mt-3 text-sm font-bold text-[var(--plum)] hover:underline"
+                  >
+                    {query.trim() ? "검색어 지우기" : "첫 글 쓰기"}
+                  </button>
+                </div>
               ) : null}
               {filteredPosts.map((post) => {
                 const selected = selectedPost?.id === post.id;
@@ -780,12 +802,15 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
                 <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
                   {selectedPost.title}
                 </h3>
-                <div className="mt-3">
+                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <VerifiedName
                     name={selectedPost.author}
                     verifiedCount={selectedPost.authorVerifiedPersonaCount ?? 0}
                     compact
                   />
+                  <span className="text-xs text-[var(--ink-soft)]">
+                    · {selectedPost.createdAt}
+                  </span>
                 </div>
                 <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[var(--ink-soft)]">
                   {selectedPost.body}
@@ -825,28 +850,34 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
                     </span>
                   </div>
                   <div className="mt-3 space-y-3">
-                    {selectedPost.comments.map((comment) => (
-                      <div
-                        key={comment.id}
-                        className="rounded-[8px] bg-[#fbf6f0] p-3"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <VerifiedName
-                            name={comment.author}
-                            verifiedCount={
-                              comment.authorVerifiedPersonaCount ?? 0
-                            }
-                            compact
-                          />
-                          <span className="text-xs text-[var(--ink-soft)]">
-                            {comment.createdAt}
-                          </span>
+                    {selectedPost.comments.length > 0 ? (
+                      selectedPost.comments.map((comment) => (
+                        <div
+                          key={comment.id}
+                          className="rounded-[8px] bg-[#fbf6f0] p-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <VerifiedName
+                              name={comment.author}
+                              verifiedCount={
+                                comment.authorVerifiedPersonaCount ?? 0
+                              }
+                              compact
+                            />
+                            <span className="text-xs text-[var(--ink-soft)]">
+                              {comment.createdAt}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+                            {comment.body}
+                          </p>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
-                          {comment.body}
-                        </p>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="rounded-[8px] bg-[#fbf6f0] px-3 py-5 text-center text-sm text-[var(--ink-soft)]">
+                        아직 댓글이 없습니다. 첫 댓글을 남겨보세요.
+                      </p>
+                    )}
                   </div>
                   <form
                     onSubmit={(event) => submitComment(selectedPost.id, event)}
@@ -877,6 +908,11 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
                         <Send className="size-4" />
                       </button>
                     </div>
+                    {commentSubmitErrors[selectedPost.id] ? (
+                      <p role="alert" className="mt-2 text-xs text-[var(--coral)]">
+                        {commentSubmitErrors[selectedPost.id]}
+                      </p>
+                    ) : null}
                   </form>
                 </div>
               </article>
@@ -911,7 +947,15 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
               <h2 className="text-sm font-extrabold">익명 편지함</h2>
               <Lock className="size-4 text-[#987000]" />
             </div>
+            <p className="mb-3 text-xs leading-5 text-[#725d23]">
+              작성한 편지는 이름 없이 공개됩니다.
+            </p>
             <div className="space-y-3">
+              {communityLetters.length === 0 ? (
+                <p className="rounded-[8px] bg-white/72 px-3 py-6 text-center text-sm text-[#725d23]">
+                  아직 공개된 편지가 없습니다.
+                </p>
+              ) : null}
               {communityLetters.map((letter) => (
                 <button
                   key={letter.id}
@@ -935,7 +979,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
               value={letterDraft}
               onChange={(event) => setLetterDraft(event.target.value)}
               className="mt-3 min-h-20 w-full resize-none rounded-[8px] border border-[#ead18a] bg-white/80 p-3 text-sm outline-none focus:border-[#987000]"
-              placeholder="배우자에게 차마 못 한 말을 적어두기"
+              placeholder="이름 없이 나누고 싶은 말을 적어주세요"
             />
             <button
               onClick={submitLetter}
@@ -1067,7 +1111,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
           <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--line)] bg-[rgba(255,250,246,0.94)] px-3 backdrop-blur">
             <button
               aria-label="글 닫기"
-              onClick={() => router.push("/")}
+              onClick={() => router.push(homeHref(activeCategory))}
               className="grid size-10 place-items-center rounded-[8px] border border-[var(--line)] bg-white text-[var(--foreground)]"
             >
               <X className="size-5" />
@@ -1096,6 +1140,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
             <MobilePostDetail
               post={selectedPost}
               commentDraft={commentDrafts[selectedPost.id] ?? ""}
+              commentError={commentSubmitErrors[selectedPost.id] ?? ""}
               onCommentDraftChange={(value) =>
                 setCommentDrafts((current) => ({
                   ...current,
@@ -1296,6 +1341,7 @@ function visibleCategoryForPost(
 function MobilePostDetail({
   post,
   commentDraft,
+  commentError,
   onCommentDraftChange,
   canUseName,
   commentAsMe,
@@ -1306,6 +1352,7 @@ function MobilePostDetail({
 }: {
   post: CommunityPost;
   commentDraft: string;
+  commentError: string;
   onCommentDraftChange: (value: string) => void;
   canUseName: boolean;
   commentAsMe: boolean;
@@ -1324,12 +1371,13 @@ function MobilePostDetail({
       <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
         {post.title}
       </h3>
-      <div className="mt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <VerifiedName
           name={post.author}
           verifiedCount={post.authorVerifiedPersonaCount ?? 0}
           compact
         />
+        <span className="text-xs text-[var(--ink-soft)]">· {post.createdAt}</span>
       </div>
       <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[var(--ink-soft)]">
         {post.body}
@@ -1364,23 +1412,29 @@ function MobilePostDetail({
           </span>
         </div>
         <div className="mt-3 space-y-3">
-          {post.comments.map((comment) => (
-            <div key={comment.id} className="rounded-[8px] bg-[#fbf6f0] p-3">
-              <div className="flex items-center justify-between gap-3">
-                <VerifiedName
-                  name={comment.author}
-                  verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
-                  compact
-                />
-                <span className="text-xs text-[var(--ink-soft)]">
-                  {comment.createdAt}
-                </span>
+          {post.comments.length > 0 ? (
+            post.comments.map((comment) => (
+              <div key={comment.id} className="rounded-[8px] bg-[#fbf6f0] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <VerifiedName
+                    name={comment.author}
+                    verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
+                    compact
+                  />
+                  <span className="text-xs text-[var(--ink-soft)]">
+                    {comment.createdAt}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+                  {comment.body}
+                </p>
               </div>
-              <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
-                {comment.body}
-              </p>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="rounded-[8px] bg-[#fbf6f0] px-3 py-5 text-center text-sm text-[var(--ink-soft)]">
+              아직 댓글이 없습니다. 첫 댓글을 남겨보세요.
+            </p>
+          )}
         </div>
         <form onSubmit={onSubmitComment} className="mt-3">
           {canUseName ? (
@@ -1403,6 +1457,11 @@ function MobilePostDetail({
               <Send className="size-4" />
             </button>
           </div>
+          {commentError ? (
+            <p role="alert" className="mt-2 text-xs text-[var(--coral)]">
+              {commentError}
+            </p>
+          ) : null}
         </form>
       </div>
     </article>

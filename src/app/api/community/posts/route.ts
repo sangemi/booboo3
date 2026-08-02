@@ -10,8 +10,8 @@ export async function GET() {
     const session = await auth();
     const posts = await listCommunityPosts(session?.user?.id);
     return NextResponse.json({
-      posts: posts.length > 0 ? posts : seedPosts,
-      source: posts.length > 0 ? "database" : "seed",
+      posts,
+      source: "database",
     });
   } catch (error) {
     console.error("Failed to list community posts", error);

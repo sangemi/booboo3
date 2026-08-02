@@ -54,39 +54,43 @@ export function AdminUserTable({ users }: { users: UserRow[] }) {
 
     setSaving(true);
     setError("");
-    const response = await fetch(`/api/admin/users/${grant.user.id}/wallet`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        asset: grant.asset,
-        amount: parsedAmount,
-        reason: reason.trim(),
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
+    try {
+      const response = await fetch(`/api/admin/users/${grant.user.id}/wallet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          asset: grant.asset,
+          amount: parsedAmount,
+          reason: reason.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      setError(data.error || "재화를 지급하지 못했습니다.");
+      if (!response.ok) {
+        setError(data.error || "재화를 지급하지 못했습니다.");
+        return;
+      }
+
+      setRows((current) =>
+        current.map((user) =>
+          user.id === grant.user.id
+            ? {
+                ...user,
+                cashBalance: data.cashBalance,
+                pointBalance: data.pointBalance,
+              }
+            : user,
+        ),
+      );
+      setMessage(
+        `${displayName(grant.user)}님에게 ${assetLabel(grant.asset)} ${parsedAmount.toLocaleString()}을 지급했습니다.`,
+      );
+      setGrant(null);
+    } catch {
+      setError("네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
+    } finally {
       setSaving(false);
-      return;
     }
-
-    setRows((current) =>
-      current.map((user) =>
-        user.id === grant.user.id
-          ? {
-              ...user,
-              cashBalance: data.cashBalance,
-              pointBalance: data.pointBalance,
-            }
-          : user,
-      ),
-    );
-    setMessage(
-      `${displayName(grant.user)}님에게 ${assetLabel(grant.asset)} ${parsedAmount.toLocaleString()}을 지급했습니다.`,
-    );
-    setGrant(null);
-    setSaving(false);
   }
 
   return (

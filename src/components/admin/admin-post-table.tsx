@@ -50,25 +50,28 @@ export function AdminPostTable({ posts }: { posts: PostRow[] }) {
     if (selected.size === 0 || deleting) return;
     setDeleting(true);
     setError("");
+    try {
+      const response = await fetch("/api/admin/posts", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postIds: Array.from(selected) }),
+      });
+      const data = await response.json().catch(() => ({}));
 
-    const response = await fetch("/api/admin/posts", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ postIds: Array.from(selected) }),
-    });
-    const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || "게시글을 삭제하지 못했습니다.");
+        return;
+      }
 
-    if (!response.ok) {
-      setError(data.error || "게시글을 삭제하지 못했습니다.");
+      setRows((current) => current.filter((post) => !selected.has(post.id)));
+      setMessage(`${data.deletedCount.toLocaleString()}개의 게시글을 삭제했습니다.`);
+      setSelected(new Set());
+      setConfirmOpen(false);
+    } catch {
+      setError("네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
+    } finally {
       setDeleting(false);
-      return;
     }
-
-    setRows((current) => current.filter((post) => !selected.has(post.id)));
-    setMessage(`${data.deletedCount.toLocaleString()}개의 게시글을 삭제했습니다.`);
-    setSelected(new Set());
-    setConfirmOpen(false);
-    setDeleting(false);
   }
 
   return (

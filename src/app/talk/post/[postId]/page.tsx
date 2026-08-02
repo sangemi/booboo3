@@ -1,10 +1,21 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { auth } from "@/auth";
 import { BoobooApp } from "@/components/booboo/booboo-app";
-import type { CategoryKey } from "@/lib/community-data";
-import { getCommunityPostByPublicId } from "@/lib/community-service";
+import {
+  type CategoryKey,
+  dailyMissionSelection,
+  letters as seedLetters,
+  seedPosts,
+} from "@/lib/community-data";
+import {
+  getCommunityPostByPublicId,
+  getTodayCommunityMission,
+  listAnonymousLetters,
+  listCommunityPosts,
+} from "@/lib/community-service";
 
 type PostPageProps = {
   params: Promise<{ postId: string }>;
@@ -35,17 +46,30 @@ export async function generateMetadata({
 export default async function PostPage({ params, searchParams }: PostPageProps) {
   const { postId } = await params;
   const { category } = await searchParams;
-  const session = await auth();
-  const post = await getCommunityPostByPublicId(
-    Number(postId),
-    session?.user?.id,
-  );
+  const [session, cookieStore] = await Promise.all([auth(), cookies()]);
+  const [post, posts, letters, mission] = await Promise.all([
+    getCommunityPostByPublicId(Number(postId), session?.user?.id),
+    listCommunityPosts(session?.user?.id).catch(() => seedPosts),
+    listAnonymousLetters(cookieStore.get("booboo_anon_id")?.value).catch(
+      () => seedLetters,
+    ),
+    getTodayCommunityMission(session?.user?.id).catch(
+      () => dailyMissionSelection().mission,
+    ),
+  ]);
 
   if (!post) notFound();
+
+  const initialPosts = posts.some((item) => item.id === post.id)
+    ? posts
+    : [post, ...posts];
 
   return (
     <BoobooApp
       initialPost={post}
+      initialPosts={initialPosts}
+      initialLetters={letters}
+      initialMission={mission}
       initialCategory={normalizeCategory(category)}
     />
   );

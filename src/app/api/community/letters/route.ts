@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
       request.cookies.get("booboo_anon_id")?.value,
     );
     return NextResponse.json({
-      letters: letters.length > 0 ? letters : seedLetters,
-      source: letters.length > 0 ? "database" : "seed",
+      letters,
+      source: "database",
     });
   } catch (error) {
     console.error("Failed to list anonymous letters", error);
