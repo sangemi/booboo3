@@ -417,17 +417,13 @@ export function BoobooApp() {
               <div className="min-w-0">
                 <p className="inline-flex items-center gap-2 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 text-[11px] font-bold text-[var(--plum)]">
                   <Sparkles className="size-3.5" />
-                  부부라이프
+                  목표
                 </p>
-                <p className="mt-2 text-sm font-bold leading-6 md:text-base">
-                  잘 사는 부부에게는 배움을, 다투는 부부에게는 건강한 싸움의
+                <p className="mt-2 text-sm leading-6 md:text-base">
+                  행복한 부부는 더 배우고 나누고, 다투는 부부는 건강하게 싸우는
                   연습을.
                 </p>
               </div>
-              <p className="max-w-xl text-xs leading-5 text-[var(--ink-soft)] md:text-right">
-                보통 부부의 일상을 나누고, 싸움은 비난보다 회복 쪽으로
-                정리합니다.
-              </p>
             </div>
           </div>
 

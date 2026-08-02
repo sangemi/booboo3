@@ -30,7 +30,9 @@ export default function RootLayout({
       lang="ko"
       className={`${notoSansKr.variable} ${gowunBatang.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col [overflow-wrap:break-word] [text-wrap:pretty] [white-space:normal] [word-break:keep-all]">
+        {children}
+      </body>
     </html>
   );
 }

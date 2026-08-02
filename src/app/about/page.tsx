@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HeartHandshake, MessageCircle, Scale, Sprout } from "lucide-react";
+import { Brain, Scale, ShieldCheck, Sprout } from "lucide-react";
 
 import { SiteFooter } from "@/components/booboo/site-footer";
 import { SiteHeader } from "@/components/booboo/site-header";
@@ -13,28 +13,28 @@ export const metadata: Metadata = {
 
 const principles = [
   {
-    icon: MessageCircle,
-    title: "자극보다 맥락",
-    body:
-      "한 장면만 보고 사람을 단정하지 않습니다. 왜 그런 말이 나왔는지, 무엇을 놓쳤는지, 다음 대화에서 무엇을 바꿀 수 있는지 함께 봅니다.",
-  },
-  {
-    icon: Scale,
-    title: "판정은 하되, 낙인은 남기지 않기",
-    body:
-      "누가 더 잘못했는지 묻는 일은 때로 필요합니다. 다만 판정의 목적은 망신주기가 아니라 상황을 정리하고 다시 말할 기회를 만드는 데 있습니다.",
-  },
-  {
     icon: Sprout,
     title: "잘 사는 부부에게서 배우기",
     body:
       "행복한 부부의 이야기를 질투하거나 냉소하지 않습니다. 작은 말투, 집안일의 방식, 사과하는 습관처럼 따라 해볼 수 있는 생활의 기술로 읽습니다.",
   },
   {
-    icon: HeartHandshake,
-    title: "싸움 이후까지 보기",
+    icon: Brain,
+    title: "마음 공부의 필요성 나누기",
     body:
-      "부부의 이야기는 싸운 순간에서 끝나지 않습니다. 사과했는지, 풀렸는지, 다시 같은 일이 생겼는지까지 남길 때 다른 부부에게 진짜 도움이 됩니다.",
+      "어른이 된 이후, 특히 부부가 된 이후 마음가짐에 대해 따로 공부한 사람은 많지 않습니다. 부부라이프는 대화법보다 먼저 마음을 보는 연습을 나눕니다.",
+  },
+  {
+    icon: Scale,
+    title: "부부싸움에서도 배우기",
+    body:
+      "누가 더 잘못했는지 묻는 일은 때로 필요합니다. 다만 판정의 목적은 망신주기가 아니라 배우기 위함입니다.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "확실한 신원확인",
+    body:
+      "완전한 익명 커뮤니티입니다. 다만 글쓴이가 원하는 경우 댓글에서 성별과 나이대는 공개됩니다. 아내가 남자들의 생각을 알고 싶어서 질문을 하는 경우도 있기 때문입니다.",
   },
 ];
 
@@ -65,7 +65,7 @@ export default function AboutPage() {
               왜 부부라이프인가
             </p>
             <h2 className="mt-3 font-serif text-3xl font-bold leading-tight">
-              인터넷은 싸움에 빠르고, 보통의 삶에는 느립니다.
+              인터넷은 자극에 반응하기 때문에, 보통의 삶은 묻히게 됩니다.
             </h2>
           </div>
           <div className="space-y-5 text-sm leading-7 text-[var(--ink-soft)] md:text-base md:leading-8">
@@ -96,7 +96,7 @@ export default function AboutPage() {
             보통 부부를 위한 공간
           </p>
           <h2 className="mt-3 font-serif text-3xl font-bold leading-tight">
-            잘 살고 있는 부부에게도 이야기를 둘 곳이 필요합니다.
+            잘 살고 있는 부부에게도 이야기를 나눌 곳이 필요합니다.
           </h2>
         </div>
         <div className="mt-7 grid gap-5 text-sm leading-7 text-[var(--ink-soft)] md:grid-cols-2 md:text-base md:leading-8">
@@ -155,14 +155,8 @@ export default function AboutPage() {
           <p className="text-sm font-extrabold text-[var(--plum)]">
             커뮤니티의 약속
           </p>
-          <h2 className="mt-3 font-serif text-3xl font-bold leading-tight">
-            부부라이프는 싸움을 없애겠다고 말하지 않습니다.
-          </h2>
-          <p className="mt-5 max-w-3xl text-sm leading-7 text-[var(--ink-soft)] md:text-base md:leading-8">
-            대신 더 건강하게 싸우는 법을 연습하려 합니다. 상대를 이기는 댓글보다
-            상황을 이해하는 댓글, 누군가를 몰아붙이는 판정보다 다음 행동을
-            생각하게 하는 판정, 상처만 남기는 글보다 이후의 회복까지 이어지는
-            기록을 더 귀하게 다룹니다.
+          <p className="mt-3 max-w-3xl font-serif text-3xl font-bold leading-tight">
+            치우치지 않고 오직 건강한 부부를 바라보고 운영하겠습니다.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
