@@ -51,6 +51,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientSecret: process.env.AUTH_KAKAO_SECRET,
       allowDangerousEmailAccountLinking: true,
       authorization: {
+        url: "https://kauth.kakao.com/oauth/authorize",
         params: {
           scope:
             "profile_nickname profile_image account_email gender age_range",

@@ -16,9 +16,6 @@ const registerSchema = z.object({
     .max(20)
     .regex(/^[가-힣a-zA-Z0-9_]+$/),
   gender: z.enum(["남성", "여성"]).optional(),
-  ageConfirmed: z.literal(true),
-  termsAccepted: z.literal(true),
-  privacyAccepted: z.literal(true),
 });
 
 export async function POST(request: Request) {
