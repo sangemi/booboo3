@@ -54,8 +54,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorization: {
         url: "https://kauth.kakao.com/oauth/authorize",
         params: {
-          scope:
-            "profile_nickname profile_image account_email gender age_range",
+          scope: "account_email gender age_range",
         },
       },
     }),
