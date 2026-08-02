@@ -22,8 +22,13 @@ export const metadata: Metadata = {
   description:
     "결혼생활, 부부소통, 육아, 데이트 이야기를 나누는 따뜻한 커뮤니티",
   icons: {
-    icon: [{ url: "/icon.svg?v=1", type: "image/svg+xml" }],
-    shortcut: "/icon.svg?v=1",
+    apple: [
+      {
+        url: "/brand/booboolife-mark-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+    ],
   },
 };
 

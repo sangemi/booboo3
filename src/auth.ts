@@ -52,7 +52,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
-          scope: "profile_nickname profile_image account_email gender",
+          scope:
+            "profile_nickname profile_image account_email gender age_range",
         },
       },
     }),

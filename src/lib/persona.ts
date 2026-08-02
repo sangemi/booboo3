@@ -64,63 +64,86 @@ type SocialPersonaInput = {
 
 export async function syncSocialPersonas(input: SocialPersonaInput) {
   const gender = readSocialGender(input.provider, input.profile);
-  if (!gender) return;
+  const ageRange = readKakaoAgeRange(input.provider, input.profile);
+  const claims = [
+    gender
+      ? {
+          type: PersonaType.GENDER,
+          value: gender === "male" ? "남성" : "여성",
+          normalizedValue: gender,
+          claim: "gender",
+        }
+      : null,
+    ageRange
+      ? {
+          type: PersonaType.AGE_GROUP,
+          value: formatAgeRange(ageRange),
+          normalizedValue: ageRange,
+          claim: "age_range",
+        }
+      : null,
+  ].filter((claim) => claim !== null);
+
+  if (claims.length === 0) return;
 
   const source =
     input.provider === "kakao"
       ? PersonaVerificationSource.KAKAO
       : PersonaVerificationSource.GOOGLE;
-  const sourceRef = `${input.provider}:${input.providerAccountId}:gender`;
 
   await prisma.$transaction(async (tx) => {
-    const persona = await tx.userPersona.upsert({
-      where: {
-        userId_type_normalizedValue: {
-          userId: input.userId,
-          type: PersonaType.GENDER,
-          normalizedValue: gender,
+    for (const claim of claims) {
+      const sourceRef = `${input.provider}:${input.providerAccountId}:${claim.claim}`;
+      const persona = await tx.userPersona.upsert({
+        where: {
+          userId_type_normalizedValue: {
+            userId: input.userId,
+            type: claim.type,
+            normalizedValue: claim.normalizedValue,
+          },
         },
-      },
-      create: {
-        userId: input.userId,
-        type: PersonaType.GENDER,
-        label: personaLabels[PersonaType.GENDER],
-        value: gender === "male" ? "남성" : "여성",
-        normalizedValue: gender,
-        status: PersonaVerificationStatus.VERIFIED,
-        source,
-        sourceRef,
-        verifiedAt: new Date(),
-      },
-      update: {
-        status: PersonaVerificationStatus.VERIFIED,
-        source,
-        sourceRef,
-        verifiedAt: new Date(),
-      },
-    });
+        create: {
+          userId: input.userId,
+          type: claim.type,
+          label: personaLabels[claim.type],
+          value: claim.value,
+          normalizedValue: claim.normalizedValue,
+          status: PersonaVerificationStatus.VERIFIED,
+          source,
+          sourceRef,
+          verifiedAt: new Date(),
+        },
+        update: {
+          value: claim.value,
+          status: PersonaVerificationStatus.VERIFIED,
+          source,
+          sourceRef,
+          verifiedAt: new Date(),
+        },
+      });
 
-    const existingVerification = await tx.personaVerification.findFirst({
-      where: {
-        personaId: persona.id,
-        source,
-        sourceRef,
-        status: PersonaReviewStatus.APPROVED,
-      },
-      select: { id: true },
-    });
-
-    if (!existingVerification) {
-      await tx.personaVerification.create({
-        data: {
+      const existingVerification = await tx.personaVerification.findFirst({
+        where: {
           personaId: persona.id,
           source,
           sourceRef,
           status: PersonaReviewStatus.APPROVED,
-          reviewedAt: new Date(),
-          evidence: { claim: "gender", provider: input.provider },
         },
+        select: { id: true },
       });
+
+      if (!existingVerification) {
+        await tx.personaVerification.create({
+          data: {
+            personaId: persona.id,
+            source,
+            sourceRef,
+            status: PersonaReviewStatus.APPROVED,
+            reviewedAt: new Date(),
+            evidence: { claim: claim.claim, provider: input.provider },
+          },
+        });
+      }
     }
   });
 }
@@ -145,4 +168,29 @@ function readSocialGender(provider: string, profile: unknown) {
 function normalizeGender(value: unknown): "male" | "female" | null {
   if (value === "male" || value === "female") return value;
   return null;
+}
+
+function readKakaoAgeRange(provider: string, profile: unknown) {
+  if (provider !== "kakao" || !profile || typeof profile !== "object") {
+    return null;
+  }
+
+  const kakaoAccount = (profile as Record<string, unknown>).kakao_account;
+  if (!kakaoAccount || typeof kakaoAccount !== "object") return null;
+
+  const ageRange = (kakaoAccount as Record<string, unknown>).age_range;
+  if (typeof ageRange !== "string") return null;
+
+  return /^\d+~(?:\d+)?$/.test(ageRange) ? ageRange : null;
+}
+
+function formatAgeRange(ageRange: string) {
+  const [minimum, maximum] = ageRange.split("~");
+
+  if (!maximum) return `${minimum}세 이상`;
+  if (minimum.endsWith("0") && Number(maximum) === Number(minimum) + 9) {
+    return `${minimum.slice(0, -1)}0대`;
+  }
+
+  return `${minimum}~${maximum}세`;
 }
