@@ -15,8 +15,10 @@ import {
   ThumbsUp,
   X,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import { VerifiedName } from "@/components/booboo/verified-name";
 import {
   categories,
   categoryLabels,
@@ -44,6 +46,7 @@ const verdictOptions: Array<{
 ];
 
 export function BoobooApp() {
+  const { data: session } = useSession();
   const [posts, setPosts] = useState<CommunityPost[]>(seedPosts);
   const [activeCategory, setActiveCategory] = useState<CategoryKey>("all");
   const [query, setQuery] = useState("");
@@ -58,6 +61,8 @@ export function BoobooApp() {
     category: "talk" as Exclude<CategoryKey, "all">,
   });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [postAsMe, setPostAsMe] = useState(false);
+  const [commentAsMe, setCommentAsMe] = useState(false);
   const [letterDraft, setLetterDraft] = useState("");
 
   useEffect(() => {
@@ -209,7 +214,10 @@ export function BoobooApp() {
       category: newPost.category,
       title: newPost.title.trim(),
       body: newPost.body.trim(),
-      author: "익명의 부부",
+      author:
+        postAsMe && session?.user?.name ? session.user.name : "익명의 부부",
+      authorVerifiedPersonaCount:
+        postAsMe && session?.user ? session.user.verifiedPersonaCount : 0,
       coupleStage: "새 이야기",
       mood: "warm",
       temperature: 70,
@@ -231,6 +239,7 @@ export function BoobooApp() {
           title: newPost.title,
           body: newPost.body,
           tags: ["새글"],
+          isAnonymous: !postAsMe,
         }),
       });
 
@@ -250,6 +259,7 @@ export function BoobooApp() {
     }
 
     setNewPost({ title: "", body: "", category: "talk" });
+    setPostAsMe(false);
     setComposerOpen(false);
   }
 
@@ -300,7 +310,11 @@ export function BoobooApp() {
       const response = await fetch(`/api/community/posts/${postId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: draft, tone: "support" }),
+        body: JSON.stringify({
+          body: draft,
+          tone: "support",
+          isAnonymous: !commentAsMe,
+        }),
       });
 
       if (response.ok) {
@@ -332,7 +346,14 @@ export function BoobooApp() {
                 ...post.comments,
                 {
                   id: crypto.randomUUID(),
-                  author: "방문자",
+                  author:
+                    commentAsMe && session?.user?.name
+                      ? session.user.name
+                      : "방문자",
+                  authorVerifiedPersonaCount:
+                    commentAsMe && session?.user
+                      ? session.user.verifiedPersonaCount
+                      : 0,
                   body: draft,
                   tone: "support",
                   createdAt: "방금 전",
@@ -476,9 +497,41 @@ export function BoobooApp() {
                 placeholder="상황, 마음, 원하는 피드백을 적어주세요."
               />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-[var(--ink-soft)]">
-                  지금은 부부톡과 생활팁 두 게시판만 열어둡니다.
-                </p>
+                {session?.user ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-[var(--ink-soft)]">
+                      글쓴이
+                    </span>
+                    <div className="flex rounded-[8px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setPostAsMe(false)}
+                        className={cn(
+                          "h-8 rounded-[6px] px-3 text-xs",
+                          !postAsMe
+                            ? "bg-white font-bold text-[var(--plum)] shadow-sm"
+                            : "text-[var(--ink-soft)]",
+                        )}
+                      >
+                        익명
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPostAsMe(true)}
+                        className={cn(
+                          "h-8 rounded-[6px] px-3 text-xs",
+                          postAsMe
+                            ? "bg-white font-bold text-[var(--plum)] shadow-sm"
+                            : "text-[var(--ink-soft)]",
+                        )}
+                      >
+                        내 이름
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--ink-soft)]">익명으로 올라갑니다.</p>
+                )}
                 <button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white">
                   <Send className="size-4" />
                   올리기
@@ -552,6 +605,13 @@ export function BoobooApp() {
                 <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
                   {selectedPost.title}
                 </h3>
+                <div className="mt-3">
+                  <VerifiedName
+                    name={selectedPost.author}
+                    verifiedCount={selectedPost.authorVerifiedPersonaCount ?? 0}
+                    compact
+                  />
+                </div>
                 <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">
                   {selectedPost.body}
                 </p>
@@ -650,7 +710,13 @@ export function BoobooApp() {
                         className="rounded-[8px] bg-[#fbf6f0] p-3"
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <strong className="text-sm">{comment.author}</strong>
+                          <VerifiedName
+                            name={comment.author}
+                            verifiedCount={
+                              comment.authorVerifiedPersonaCount ?? 0
+                            }
+                            compact
+                          />
                           <span className="text-xs text-[var(--ink-soft)]">
                             {comment.createdAt}
                           </span>
@@ -663,25 +729,33 @@ export function BoobooApp() {
                   </div>
                   <form
                     onSubmit={(event) => submitComment(selectedPost.id, event)}
-                    className="mt-3 flex gap-2"
+                    className="mt-3"
                   >
-                    <input
-                      value={commentDrafts[selectedPost.id] ?? ""}
-                      onChange={(event) =>
-                        setCommentDrafts((current) => ({
-                          ...current,
-                          [selectedPost.id]: event.target.value,
-                        }))
-                      }
-                      className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
-                      placeholder="따뜻한 댓글 남기기"
-                    />
-                    <button
-                      aria-label="댓글 등록"
-                      className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white"
-                    >
-                      <Send className="size-4" />
-                    </button>
+                    {session?.user ? (
+                      <CommentIdentityControl
+                        asMe={commentAsMe}
+                        onChange={setCommentAsMe}
+                      />
+                    ) : null}
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={commentDrafts[selectedPost.id] ?? ""}
+                        onChange={(event) =>
+                          setCommentDrafts((current) => ({
+                            ...current,
+                            [selectedPost.id]: event.target.value,
+                          }))
+                        }
+                        className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
+                        placeholder="따뜻한 댓글 남기기"
+                      />
+                      <button
+                        aria-label="댓글 등록"
+                        className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white"
+                      >
+                        <Send className="size-4" />
+                      </button>
+                    </div>
                   </form>
                 </div>
               </article>
@@ -816,6 +890,9 @@ export function BoobooApp() {
                   [selectedPost.id]: value,
                 }))
               }
+              canUseName={Boolean(session?.user)}
+              commentAsMe={commentAsMe}
+              onCommentIdentityChange={setCommentAsMe}
               onSubmitComment={(event) => submitComment(selectedPost.id, event)}
               onReact={(type) => reactToPost(selectedPost.id, type)}
               onVerdict={(choice) => voteVerdict(selectedPost.id, choice)}
@@ -840,6 +917,9 @@ function MobilePostDetail({
   post,
   commentDraft,
   onCommentDraftChange,
+  canUseName,
+  commentAsMe,
+  onCommentIdentityChange,
   onSubmitComment,
   onReact,
   onVerdict,
@@ -847,6 +927,9 @@ function MobilePostDetail({
   post: CommunityPost;
   commentDraft: string;
   onCommentDraftChange: (value: string) => void;
+  canUseName: boolean;
+  commentAsMe: boolean;
+  onCommentIdentityChange: (value: boolean) => void;
   onSubmitComment: (event: FormEvent<HTMLFormElement>) => void;
   onReact: (type: keyof CommunityPost["reactions"]) => void;
   onVerdict: (choice: keyof VerdictState) => void;
@@ -864,6 +947,13 @@ function MobilePostDetail({
       <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
         {post.title}
       </h3>
+      <div className="mt-3">
+        <VerifiedName
+          name={post.author}
+          verifiedCount={post.authorVerifiedPersonaCount ?? 0}
+          compact
+        />
+      </div>
       <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">{post.body}</p>
 
       <div className="mt-5 flex flex-wrap gap-2">
@@ -950,7 +1040,11 @@ function MobilePostDetail({
           {post.comments.map((comment) => (
             <div key={comment.id} className="rounded-[8px] bg-[#fbf6f0] p-3">
               <div className="flex items-center justify-between gap-3">
-                <strong className="text-sm">{comment.author}</strong>
+                <VerifiedName
+                  name={comment.author}
+                  verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
+                  compact
+                />
                 <span className="text-xs text-[var(--ink-soft)]">
                   {comment.createdAt}
                 </span>
@@ -961,22 +1055,70 @@ function MobilePostDetail({
             </div>
           ))}
         </div>
-        <form onSubmit={onSubmitComment} className="mt-3 flex gap-2">
-          <input
-            value={commentDraft}
-            onChange={(event) => onCommentDraftChange(event.target.value)}
-            className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
-            placeholder="따뜻한 댓글 남기기"
-          />
-          <button
-            aria-label="댓글 등록"
-            className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white"
-          >
-            <Send className="size-4" />
-          </button>
+        <form onSubmit={onSubmitComment} className="mt-3">
+          {canUseName ? (
+            <CommentIdentityControl
+              asMe={commentAsMe}
+              onChange={onCommentIdentityChange}
+            />
+          ) : null}
+          <div className="mt-2 flex gap-2">
+            <input
+              value={commentDraft}
+              onChange={(event) => onCommentDraftChange(event.target.value)}
+              className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
+              placeholder="따뜻한 댓글 남기기"
+            />
+            <button
+              aria-label="댓글 등록"
+              className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white"
+            >
+              <Send className="size-4" />
+            </button>
+          </div>
         </form>
       </div>
     </article>
+  );
+}
+
+function CommentIdentityControl({
+  asMe,
+  onChange,
+}: {
+  asMe: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-bold text-[var(--ink-soft)]">댓글 이름</span>
+      <div className="flex rounded-[8px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={cn(
+            "h-7 rounded-[6px] px-2.5 text-[11px]",
+            !asMe
+              ? "bg-white font-bold text-[var(--plum)] shadow-sm"
+              : "text-[var(--ink-soft)]",
+          )}
+        >
+          익명
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={cn(
+            "h-7 rounded-[6px] px-2.5 text-[11px]",
+            asMe
+              ? "bg-white font-bold text-[var(--plum)] shadow-sm"
+              : "text-[var(--ink-soft)]",
+          )}
+        >
+          내 이름
+        </button>
+      </div>
+    </div>
   );
 }
 

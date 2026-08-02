@@ -19,10 +19,31 @@ import type {
 } from "@/lib/community-data";
 import { prisma } from "@/lib/db";
 
+type AuthorSummary = {
+  name: string | null;
+  nickname: string | null;
+  _count: { personas: number };
+} | null;
+
+type CommentWithAuthor = CommentModel & {
+  author: AuthorSummary;
+};
+
 type PostWithRelations = PostModel & {
-  comments: CommentModel[];
+  author: AuthorSummary;
+  comments: CommentWithAuthor[];
   reactions: ReactionModel[];
   verdictVotes: VerdictVoteModel[];
+};
+
+const authorSelect = {
+  name: true,
+  nickname: true,
+  _count: {
+    select: {
+      personas: { where: { status: "VERIFIED" as const } },
+    },
+  },
 };
 
 export const categoryToDb = {
@@ -99,8 +120,10 @@ export async function listCommunityPosts() {
   const posts = await prisma.post.findMany({
     orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
     include: {
+      author: { select: authorSelect },
       comments: {
         orderBy: { createdAt: "asc" },
+        include: { author: { select: authorSelect } },
       },
       reactions: true,
       verdictVotes: true,
@@ -117,22 +140,36 @@ export async function createCommunityPost(input: {
   body: string;
   temperature?: number;
   tags: string[];
+  userId?: string;
+  isAnonymous: boolean;
 }) {
+  const isAnonymous = !input.userId || input.isAnonymous;
+  const author = input.userId
+    ? await prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { name: true, nickname: true },
+      })
+    : null;
+
   const post = await prisma.post.create({
     data: {
       category: categoryToDb[input.category],
       title: input.title,
       body: input.body,
-      authorName: "익명의 부부",
+      authorId: input.userId,
+      authorName: isAnonymous
+        ? "익명의 부부"
+        : author?.nickname ?? author?.name ?? "부부라이프 회원",
       coupleStage: "새 이야기",
       mood: moodFromTemperature(input.temperature),
       temperature: input.temperature,
       readMinutes: Math.max(1, Math.ceil(input.body.length / 180)),
       tags: input.tags.length > 0 ? input.tags : ["새글"],
-      isAnonymous: true,
+      isAnonymous,
     },
     include: {
-      comments: true,
+      author: { select: authorSelect },
+      comments: { include: { author: { select: authorSelect } } },
       reactions: true,
       verdictVotes: true,
     },
@@ -145,19 +182,38 @@ export async function createCommunityComment(input: {
   postId: string;
   body: string;
   tone: keyof typeof commentToneToDb;
+  userId?: string;
+  isAnonymous: boolean;
 }) {
+  const isAnonymous = !input.userId || input.isAnonymous;
+  const author = input.userId
+    ? await prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { name: true, nickname: true },
+      })
+    : null;
   const comment = await prisma.comment.create({
     data: {
       postId: input.postId,
       body: input.body,
       tone: commentToneToDb[input.tone],
-      authorName: "방문자",
+      authorId: input.userId,
+      authorName: isAnonymous
+        ? "방문자"
+        : author?.nickname ?? author?.name ?? "부부라이프 회원",
+      isAnonymous,
     },
+    include: { author: { select: authorSelect } },
   });
 
   return {
     id: comment.id,
-    author: comment.authorName,
+    author: comment.isAnonymous
+      ? comment.authorName
+      : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
+    authorVerifiedPersonaCount: comment.isAnonymous
+      ? 0
+      : comment.author?._count.personas ?? 0,
     body: comment.body,
     tone: commentToneFromDb[comment.tone],
     createdAt: relativeTime(comment.createdAt),
@@ -297,7 +353,12 @@ function toCommunityPost(post: PostWithRelations): CommunityPost {
     category: categoryFromDb[post.category],
     title: post.title,
     body: post.body,
-    author: post.authorName,
+    author: post.isAnonymous
+      ? post.authorName
+      : post.author?.nickname ?? post.author?.name ?? post.authorName,
+    authorVerifiedPersonaCount: post.isAnonymous
+      ? 0
+      : post.author?._count.personas ?? 0,
     coupleStage: post.coupleStage ?? "부부라이프",
     mood: normalizeMood(post.mood),
     temperature: post.temperature ?? 70,
@@ -305,7 +366,12 @@ function toCommunityPost(post: PostWithRelations): CommunityPost {
     readMinutes: post.readMinutes,
     comments: post.comments.map((comment) => ({
       id: comment.id,
-      author: comment.authorName,
+      author: comment.isAnonymous
+        ? comment.authorName
+        : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
+      authorVerifiedPersonaCount: comment.isAnonymous
+        ? 0
+        : comment.author?._count.personas ?? 0,
       body: comment.body,
       tone: commentToneFromDb[comment.tone],
       createdAt: relativeTime(comment.createdAt),

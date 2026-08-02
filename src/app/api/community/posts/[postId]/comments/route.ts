@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { auth } from "@/auth";
 import { createCommentSchema } from "@/lib/community-schema";
 import { createCommunityComment } from "@/lib/community-service";
 
@@ -7,6 +8,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ postId: string }> },
 ) {
+  const session = await auth();
   const { postId } = await context.params;
   const payload = await request.json();
   const parsed = createCommentSchema.safeParse(payload);
@@ -23,6 +25,8 @@ export async function POST(
       postId,
       body: parsed.data.body,
       tone: parsed.data.tone,
+      isAnonymous: parsed.data.isAnonymous,
+      userId: session?.user?.id,
     });
     return NextResponse.json({ comment, source: "database" }, { status: 201 });
   } catch (error) {

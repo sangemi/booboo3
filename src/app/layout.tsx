@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Gowun_Batang, Noto_Sans_KR } from "next/font/google";
+
+import { AuthProvider } from "@/components/auth-provider";
+
 import "./globals.css";
 
 const notoSansKr = Noto_Sans_KR({
@@ -31,7 +34,7 @@ export default function RootLayout({
       className={`${notoSansKr.variable} ${gowunBatang.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col [overflow-wrap:break-word] [text-wrap:pretty] [white-space:normal] [word-break:keep-all]">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

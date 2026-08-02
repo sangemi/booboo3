@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { auth } from "@/auth";
 import { seedPosts } from "@/lib/community-data";
 import { createPostSchema } from "@/lib/community-schema";
 import { createCommunityPost, listCommunityPosts } from "@/lib/community-service";
@@ -18,6 +19,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await auth();
   const payload = await request.json();
   const parsed = createPostSchema.safeParse(payload);
 
@@ -29,7 +31,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const post = await createCommunityPost(parsed.data);
+    const post = await createCommunityPost({
+      ...parsed.data,
+      userId: session?.user?.id,
+    });
     return NextResponse.json({ post, source: "database" }, { status: 201 });
   } catch (error) {
     console.error("Failed to create community post", error);

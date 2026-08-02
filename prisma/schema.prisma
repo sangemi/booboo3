@@ -49,17 +49,52 @@ enum FeedbackStatus {
   HIDDEN
 }
 
+enum PersonaType {
+  GENDER
+  AGE_GROUP
+  EMPLOYER
+  PROFESSION
+  MARRIAGE_YEARS
+  PARENTING
+  OTHER
+}
+
+enum PersonaVerificationStatus {
+  DECLARED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum PersonaVerificationSource {
+  SELF
+  GOOGLE
+  KAKAO
+  WORK_EMAIL
+  DOCUMENT
+  ADMIN
+}
+
+enum PersonaReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id                 String              @id @default(cuid())
   name               String?
   email              String?             @unique
   emailVerified      DateTime?
   image              String?
-  nickname           String?
+  passwordHash       String?
+  nickname           String?             @unique
   coupleStage        String?
   role               String              @default("MEMBER")
   accounts           Account[]
   sessions           Session[]
+  personas           UserPersona[]
   posts              Post[]
   comments           Comment[]
   reactions          Reaction[]
@@ -70,6 +105,43 @@ model User {
   feedback           Feedback[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+}
+
+model UserPersona {
+  id              String                    @id @default(cuid())
+  userId          String
+  type            PersonaType
+  label           String
+  value           String
+  normalizedValue String
+  isPublic        Boolean                   @default(true)
+  status          PersonaVerificationStatus @default(DECLARED)
+  source          PersonaVerificationSource @default(SELF)
+  sourceRef       String?
+  verifiedAt      DateTime?
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verifications   PersonaVerification[]
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@unique([userId, type, normalizedValue])
+  @@index([userId, status])
+}
+
+model PersonaVerification {
+  id         String                    @id @default(cuid())
+  personaId  String
+  source     PersonaVerificationSource
+  status     PersonaReviewStatus       @default(PENDING)
+  sourceRef  String?
+  evidence   Json?
+  reviewedAt DateTime?
+  persona    UserPersona               @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+
+  @@index([personaId, createdAt])
+  @@index([status, createdAt])
 }
 
 model Account {
@@ -105,25 +177,25 @@ model VerificationToken {
 }
 
 model Post {
-  id                 String       @id @default(cuid())
+  id                 String        @id @default(cuid())
   category           PostCategory
   title              String
   body               String
   authorId           String?
-  authorName         String       @default("익명의 부부")
+  authorName         String        @default("익명의 부부")
   coupleStage        String?
   mood               String?
   temperature        Int?
-  readMinutes        Int          @default(1)
-  isPinned           Boolean      @default(false)
-  isAnonymous        Boolean      @default(false)
-  tags               String[]     @default([])
+  readMinutes        Int           @default(1)
+  isPinned           Boolean       @default(false)
+  isAnonymous        Boolean       @default(false)
+  tags               String[]      @default([])
   /// Legacy compatibility for booboo2 URLs and migrated posts.
   /// TODO(legacy): Remove after 2027-06 if old /talk/post/:id traffic is no longer needed.
-  legacyId           Int?         @unique
+  legacyId           Int?          @unique
   /// Legacy compatibility for booboo2 URLs and migrated posts.
   /// TODO(legacy): Remove after 2027-06 if old /talk/post/:id traffic is no longer needed.
-  legacyPath         String?      @unique
+  legacyPath         String?       @unique
   /// Legacy compatibility for source auditing during the booboo2 -> booboo3 migration.
   /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
   legacySource       String?
@@ -139,13 +211,13 @@ model Post {
   /// Legacy compatibility for preserving the original booboo2 publication time.
   /// TODO(legacy): Remove after 2027-06 after migration audits are complete.
   legacyCreatedAt    DateTime?
-  author             User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  author             User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
   comments           Comment[]
   reactions          Reaction[]
   verdictVotes       VerdictVote[]
   feedback           Feedback[]
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   @@index([category, createdAt])
   @@index([legacyId])
@@ -156,6 +228,7 @@ model Comment {
   postId          String
   authorId        String?
   authorName      String      @default("방문자")
+  isAnonymous     Boolean     @default(true)
   body            String
   tone            CommentTone @default(SUPPORT)
   /// Legacy compatibility for migrated booboo2 comments.

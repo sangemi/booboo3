@@ -6,11 +6,13 @@ export const createPostSchema = z.object({
   body: z.string().trim().min(10).max(5000),
   temperature: z.number().int().min(1).max(100).optional(),
   tags: z.array(z.string().trim().min(1).max(20)).max(6).default([]),
+  isAnonymous: z.boolean().default(true),
 });
 
 export const createCommentSchema = z.object({
   body: z.string().trim().min(2).max(1200),
   tone: z.enum(["support", "advice", "question"]).default("support"),
+  isAnonymous: z.boolean().default(true),
 });
 
 export const createReactionSchema = z.object({

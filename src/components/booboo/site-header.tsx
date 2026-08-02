@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, Menu, Plus, Search, X } from "lucide-react";
+import { Heart, LogIn, Menu, Plus, Search, UserRound, X } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useState } from "react";
 
+import { VerifiedName } from "@/components/booboo/verified-name";
 import { cn } from "@/lib/utils";
 
 type SiteHeaderProps = {
@@ -25,6 +27,7 @@ export function SiteHeader({
   onWriteClick,
 }: SiteHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: session, status } = useSession();
   const showCommunityActions = query !== undefined && onQueryChange && onWriteClick;
 
   return (
@@ -44,7 +47,7 @@ export function SiteHeader({
           </div>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-1 lg:flex">
           {navItems.map((item) => (
             <Link
               key={item.key}
@@ -61,38 +64,64 @@ export function SiteHeader({
           ))}
         </nav>
 
-        {showCommunityActions ? (
-          <div className="hidden items-center gap-2 md:flex">
-            <label className="relative w-72 lg:w-80">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-soft)]" />
-              <input
-                value={query}
-                onChange={(event) => onQueryChange(event.target.value)}
-                className="h-10 w-full rounded-[8px] border border-[var(--line)] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[var(--plum)] focus:ring-4 focus:ring-[rgba(111,61,91,0.12)]"
-                placeholder="집안일, 사과, 기념일..."
-              />
-            </label>
-            <button
-              onClick={onWriteClick}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[var(--coral)] px-4 text-sm font-bold text-white shadow-[0_10px_28px_rgba(255,111,97,0.18)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[rgba(255,111,97,0.24)]"
+        <div className="hidden min-w-0 items-center gap-2 lg:flex">
+          {showCommunityActions ? (
+            <>
+              <label className="relative w-52 xl:w-64">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-soft)]" />
+                <input
+                  value={query}
+                  onChange={(event) => onQueryChange(event.target.value)}
+                  className="h-10 w-full rounded-[8px] border border-[var(--line)] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[var(--plum)] focus:ring-4 focus:ring-[rgba(111,61,91,0.12)]"
+                  placeholder="집안일, 사과, 기념일..."
+                />
+              </label>
+              <button
+                onClick={onWriteClick}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[var(--coral)] px-3 text-sm font-bold text-white shadow-[0_10px_28px_rgba(255,111,97,0.18)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[rgba(255,111,97,0.24)] lg:px-4"
+              >
+                <Plus className="size-4" />
+                글쓰기
+              </button>
+            </>
+          ) : null}
+
+          {status === "authenticated" && session.user ? (
+            <Link
+              href="/mypage"
+              className="ml-1 flex h-10 max-w-36 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-white px-2.5 hover:bg-[#faf7f4]"
             >
-              <Plus className="size-4" />
-              글쓰기
-            </button>
-          </div>
-        ) : null}
+              <UserRound className="size-4 shrink-0 text-[var(--plum)]" />
+              <VerifiedName
+                name={session.user.name || "마이페이지"}
+                verifiedCount={session.user.verifiedPersonaCount}
+                compact
+              />
+            </Link>
+          ) : status === "unauthenticated" ? (
+            <Link
+              href="/login"
+              className="ml-1 inline-flex h-10 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-white px-3 text-sm font-bold hover:bg-[#faf7f4]"
+            >
+              <LogIn className="size-4" />
+              로그인
+            </Link>
+          ) : (
+            <span className="ml-1 h-10 w-20 rounded-[8px] bg-[#f4ebe3]" />
+          )}
+        </div>
 
         <button
           aria-label={mobileOpen ? "메뉴 닫기" : "메뉴 열기"}
           onClick={() => setMobileOpen((value) => !value)}
-          className="grid size-10 place-items-center rounded-[8px] border border-[var(--line)] bg-white text-[var(--foreground)] md:hidden"
+          className="grid size-10 place-items-center rounded-[8px] border border-[var(--line)] bg-white text-[var(--foreground)] lg:hidden"
         >
           {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
         </button>
       </div>
 
       {mobileOpen ? (
-        <div className="border-t border-[var(--line)] bg-[var(--paper)] px-4 py-3 md:hidden">
+        <div className="border-t border-[var(--line)] bg-[var(--paper)] px-4 py-3 lg:hidden">
           <nav className="grid gap-2">
             {navItems.map((item) => (
               <Link
@@ -109,6 +138,14 @@ export function SiteHeader({
                 {item.label}
               </Link>
             ))}
+            <Link
+              href={session?.user ? "/mypage" : "/login"}
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 rounded-[8px] px-3 py-3 text-sm font-bold text-[var(--foreground)]"
+            >
+              {session?.user ? <UserRound className="size-4" /> : <LogIn className="size-4" />}
+              {session?.user ? "마이페이지" : "로그인"}
+            </Link>
           </nav>
 
           {showCommunityActions ? (

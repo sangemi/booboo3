@@ -15,6 +15,7 @@ export type CommunityPost = {
   title: string;
   body: string;
   author: string;
+  authorVerifiedPersonaCount?: number;
   coupleStage: string;
   mood: MoodKey;
   temperature: number;
@@ -30,6 +31,7 @@ export type CommunityPost = {
 export type CommentItem = {
   id: string;
   author: string;
+  authorVerifiedPersonaCount?: number;
   body: string;
   tone: "support" | "advice" | "question";
   createdAt: string;
