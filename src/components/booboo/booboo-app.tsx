@@ -487,49 +487,56 @@ export function BoobooApp() {
             </form>
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
             <div className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
-              {filteredPosts.map((post) => (
-                <article
-                  key={post.id}
-                  onClick={() => selectPost(post.id)}
-                  className={cn(
-                    "cursor-pointer border-b border-[var(--line)] px-4 py-3 transition last:border-b-0 hover:bg-[#fbf6f0]",
-                    selectedPost?.id === post.id
-                      ? "bg-[#fbf6f0]"
-                      : "bg-white",
-                  )}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
-                        {categoryLabels[post.category]}
-                      </span>
-                      <span className="text-xs text-[var(--ink-soft)]">
-                        {post.createdAt}
-                      </span>
-                      {post.pinned ? (
-                        <span className="rounded-[6px] bg-[#fff4bf] px-2 py-1 text-xs font-bold text-[#7a5b00]">
-                          주목
+              {filteredPosts.map((post) => {
+                const selected = selectedPost?.id === post.id;
+
+                return (
+                  <article
+                    key={post.id}
+                    onClick={() => selectPost(post.id)}
+                    className={cn(
+                      "cursor-pointer border-b border-[var(--line)] px-3 py-2.5 transition last:border-b-0 hover:bg-[#fbf6f0]",
+                      selected ? "bg-[#fbf6f0]" : "bg-white",
+                    )}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-[11px] font-bold text-[var(--plum)]">
+                          {categoryLabels[post.category]}
                         </span>
-                      ) : null}
+                        <span className="text-[11px] text-[var(--ink-soft)]">
+                          {post.createdAt}
+                        </span>
+                        {post.pinned ? (
+                          <span className="rounded-[6px] bg-[#fff4bf] px-2 py-1 text-[11px] font-bold text-[#7a5b00]">
+                            주목
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] font-bold">
+                        <span className="inline-flex items-center gap-1 text-[var(--coral)]">
+                          <Heart className="size-3.5" />
+                          {post.reactions.meToo}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[var(--leaf)]">
+                          <MessageCircle className="size-3.5" />
+                          {post.comments.length}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs font-bold">
-                      <span className="inline-flex items-center gap-1 text-[var(--coral)]">
-                        <Heart className="size-3.5" />
-                        {post.reactions.meToo}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-[var(--leaf)]">
-                        <MessageCircle className="size-3.5" />
-                        {post.comments.length}
-                      </span>
-                    </div>
-                  </div>
-                  <h3 className="mt-2 text-base font-extrabold leading-snug md:text-lg">
-                    {post.title}
-                  </h3>
-                </article>
-              ))}
+                    <h3
+                      className={cn(
+                        "mt-2 text-sm leading-snug md:text-base",
+                        selected ? "font-extrabold" : "font-normal",
+                      )}
+                    >
+                      {post.title}
+                    </h3>
+                  </article>
+                );
+              })}
             </div>
 
             {selectedPost ? (
