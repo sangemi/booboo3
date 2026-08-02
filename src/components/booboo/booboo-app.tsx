@@ -1,51 +1,54 @@
 "use client";
 
 import {
-  Baby,
   Bookmark,
   Check,
-  Coffee,
   Flame,
   Heart,
-  HeartHandshake,
   Home,
   Lock,
   MessageCircle,
-  PenLine,
   Plus,
   Search,
   Send,
-  ShieldCheck,
   Smile,
   Sparkles,
-  Thermometer,
   ThumbsUp,
-  Users,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
-  badges,
   categories,
+  categoryLabels,
   CategoryKey,
   CommunityPost,
+  emptyVerdicts,
   letters,
   missions,
   seedPosts,
-  temperatureTrend,
+  VerdictState,
 } from "@/lib/community-data";
 import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/booboo/site-footer";
 
-const categoryIcons: Record<CategoryKey, React.ComponentType<{ className?: string }>> = {
+const categoryIcons: Partial<
+  Record<CategoryKey, React.ComponentType<{ className?: string }>>
+> = {
   all: Home,
   talk: MessageCircle,
-  worry: HeartHandshake,
   tips: Sparkles,
-  parenting: Baby,
-  together: Coffee,
-  letters: PenLine,
 };
+
+const verdictOptions: Array<{
+  key: keyof VerdictState;
+  label: string;
+  description: string;
+}> = [
+  { key: "husband", label: "남편 쪽", description: "남편의 책임이 더 커요" },
+  { key: "wife", label: "아내 쪽", description: "아내의 책임이 더 커요" },
+  { key: "both", label: "둘 다", description: "둘 다 돌아볼 부분이 있어요" },
+  { key: "notEnough", label: "정보 부족", description: "이야기가 더 필요해요" },
+];
 
 const moodLabels = {
   warm: "따뜻함",
@@ -58,8 +61,8 @@ export function BoobooApp() {
   const [posts, setPosts] = useState<CommunityPost[]>(seedPosts);
   const [activeCategory, setActiveCategory] = useState<CategoryKey>("all");
   const [query, setQuery] = useState("");
-  const [temperature, setTemperature] = useState(72);
   const [completedMissions, setCompletedMissions] = useState<string[]>([]);
+  const [communityLetters, setCommunityLetters] = useState(letters);
   const [selectedPostId, setSelectedPostId] = useState(seedPosts[0]?.id ?? "");
   const [composerOpen, setComposerOpen] = useState(false);
   const [newPost, setNewPost] = useState({
@@ -69,7 +72,6 @@ export function BoobooApp() {
   });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [letterDraft, setLetterDraft] = useState("");
-  const [savingTemperature, setSavingTemperature] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -94,7 +96,25 @@ export function BoobooApp() {
       }
     }
 
+    async function loadLetters() {
+      try {
+        const response = await fetch("/api/community/letters", {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as {
+          letters?: typeof letters;
+        };
+        if (!active || !payload.letters?.length) return;
+        setCommunityLetters(payload.letters);
+      } catch {
+        return;
+      }
+    }
+
     loadPosts();
+    loadLetters();
 
     return () => {
       active = false;
@@ -106,7 +126,8 @@ export function BoobooApp() {
 
     return posts.filter((post) => {
       const inCategory =
-        activeCategory === "all" || activeCategory === post.category;
+        activeCategory === "all" ||
+        activeCategory === visibleCategoryForPost(post.category);
       const inQuery =
         normalized.length === 0 ||
         `${post.title} ${post.body} ${post.author} ${post.tags.join(" ")}`
@@ -119,11 +140,6 @@ export function BoobooApp() {
 
   const selectedPost =
     posts.find((post) => post.id === selectedPostId) ?? filteredPosts[0] ?? posts[0];
-
-  const weeklyAverage = Math.round(
-    temperatureTrend.reduce((sum, item) => sum + item.score, 0) /
-      temperatureTrend.length,
-  );
 
   async function reactToPost(
     postId: string,
@@ -177,12 +193,13 @@ export function BoobooApp() {
       body: newPost.body.trim(),
       author: "익명의 부부",
       coupleStage: "새 이야기",
-      mood: temperature >= 75 ? "warm" : temperature >= 55 ? "need-talk" : "tired",
-      temperature,
+      mood: "warm",
+      temperature: 70,
       createdAt: "방금 전",
       readMinutes: Math.max(1, Math.ceil(newPost.body.length / 180)),
       comments: [],
       reactions: { meToo: 0, hug: 0, saved: 0, helpful: 0 },
+      verdicts: { ...emptyVerdicts },
       tags: ["새글"],
       pinned: false,
     };
@@ -195,7 +212,6 @@ export function BoobooApp() {
           category: newPost.category,
           title: newPost.title,
           body: newPost.body,
-          temperature,
           tags: ["새글"],
         }),
       });
@@ -217,6 +233,44 @@ export function BoobooApp() {
 
     setNewPost({ title: "", body: "", category: "talk" });
     setComposerOpen(false);
+  }
+
+  async function voteVerdict(postId: string, choice: keyof VerdictState) {
+    setPosts((current) =>
+      current.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              verdicts: {
+                ...(post.verdicts ?? emptyVerdicts),
+                [choice]: (post.verdicts?.[choice] ?? 0) + 1,
+              },
+            }
+          : post,
+      ),
+    );
+
+    try {
+      const response = await fetch(`/api/community/posts/${postId}/verdicts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ choice }),
+      });
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as {
+        verdicts?: VerdictState;
+      };
+      if (!payload.verdicts) return;
+
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === postId ? { ...post, verdicts: payload.verdicts! } : post,
+        ),
+      );
+    } catch {
+      return;
+    }
   }
 
   async function submitComment(postId: string, event: FormEvent<HTMLFormElement>) {
@@ -273,27 +327,44 @@ export function BoobooApp() {
     setCommentDrafts((current) => ({ ...current, [postId]: "" }));
   }
 
-  async function saveTemperature() {
-    setSavingTemperature(true);
-    try {
-      await fetch("/api/community/temperature", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ score: temperature }),
-      });
-    } catch {
-      return;
-    } finally {
-      setSavingTemperature(false);
-    }
-  }
-
   function completeMission(id: string) {
     setCompletedMissions((current) =>
       current.includes(id)
         ? current.filter((missionId) => missionId !== id)
         : [...current, id],
     );
+
+    fetch(`/api/community/missions/${id}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }).catch(() => undefined);
+  }
+
+  async function submitLetter() {
+    const body = letterDraft.trim();
+    if (!body) return;
+
+    const title = body.split(/\r?\n/)[0]?.slice(0, 44) || "차마 못 한 말";
+
+    try {
+      const response = await fetch("/api/community/letters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, body, tone: "서운함" }),
+      });
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as {
+        letter?: (typeof letters)[number];
+      };
+      if (!payload.letter) return;
+
+      setCommunityLetters((current) => [payload.letter!, ...current]);
+      setLetterDraft("");
+    } catch {
+      return;
+    }
   }
 
   return (
@@ -339,7 +410,7 @@ export function BoobooApp() {
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <nav className="rounded-[8px] border border-[var(--line)] bg-[var(--paper)] p-2">
             {categories.map((category) => {
-              const Icon = categoryIcons[category.key];
+              const Icon = categoryIcons[category.key] ?? MessageCircle;
               const active = activeCategory === category.key;
 
               return (
@@ -369,36 +440,11 @@ export function BoobooApp() {
               );
             })}
           </nav>
-
-          <div className="rounded-[8px] border border-[var(--line)] bg-[#263f37] p-4 text-white">
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-bold">오늘 우리 온도</p>
-              <Thermometer className="size-4 text-[#f7c948]" />
-            </div>
-            <div className="font-serif text-5xl font-bold">{temperature}</div>
-            <input
-              value={temperature}
-              min={1}
-              max={100}
-              onChange={(event) => setTemperature(Number(event.target.value))}
-              className="mt-5 w-full accent-[#f7c948]"
-              type="range"
-            />
-            <p className="mt-3 text-sm leading-6 text-white/74">
-              낮은 날은 조언보다 공감이 먼저 보이도록 피드가 조정됩니다.
-            </p>
-            <button
-              onClick={saveTemperature}
-              className="mt-4 h-10 w-full rounded-[8px] bg-white/12 text-sm font-bold text-white transition hover:bg-white/18"
-            >
-              {savingTemperature ? "저장 중" : "온도 저장"}
-            </button>
-          </div>
         </aside>
 
         <section className="min-w-0 space-y-4">
           <div className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--paper)]">
-            <div className="grid gap-0 lg:grid-cols-[1fr_260px]">
+            <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
               <div className="p-5 md:p-7">
                 <p className="mb-3 inline-flex items-center gap-2 rounded-[6px] bg-[#f4ebe3] px-3 py-1 text-xs font-bold text-[var(--plum)]">
                   <Sparkles className="size-3.5" />
@@ -408,37 +454,21 @@ export function BoobooApp() {
                   비난을 줄이고, 회복을 남기는 부부 대화장
                 </h2>
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)] md:text-base">
-                  글마다 온도, 감정, 댓글 톤을 함께 기록합니다. 답을 강요하는
-                  상담소가 아니라, 비슷한 하루를 사는 부부들이 자기 속도로
-                  회복하는 커뮤니티입니다.
+                  오늘 집에서 생긴 일을 올리고, 비슷한 하루를 살아본 사람들이
+                  따뜻한 댓글과 판정으로 함께 정리합니다.
                 </p>
               </div>
               <div className="border-t border-[var(--line)] bg-[#f7eee7] p-5 lg:border-l lg:border-t-0">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--leaf)]">
-                  Weekly pulse
+                  Verdict
                 </p>
-                <div className="mt-3 flex items-end gap-2">
-                  <strong className="font-serif text-5xl">{weeklyAverage}</strong>
-                  <span className="pb-2 text-sm text-[var(--ink-soft)]">
-                    전국 평균
-                  </span>
-                </div>
-                <div className="mt-5 flex h-24 items-end gap-2">
-                  {temperatureTrend.map((item) => (
-                    <div
-                      key={item.day}
-                      className="flex h-full flex-1 flex-col items-center justify-end gap-2"
-                    >
-                      <div
-                        className="w-full rounded-t-[4px] bg-[var(--coral)]"
-                        style={{ height: `${Math.max(12, item.score * 0.72)}px` }}
-                      />
-                      <span className="text-xs font-bold text-[var(--ink-soft)]">
-                        {item.day}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <h3 className="mt-3 font-serif text-3xl font-bold leading-tight">
+                  누가 더 잘못했나요?
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-[var(--ink-soft)]">
+                  싸움 글에는 네 가지 판정만 받습니다. 남편 쪽, 아내 쪽, 둘 다,
+                  정보 부족.
+                </p>
               </div>
             </div>
           </div>
@@ -489,7 +519,7 @@ export function BoobooApp() {
               />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-[var(--ink-soft)]">
-                  현재 온도 {temperature}도와 함께 등록됩니다.
+                  지금은 부부톡과 생활팁 두 게시판만 열어둡니다.
                 </p>
                 <button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white">
                   <Send className="size-4" />
@@ -514,7 +544,7 @@ export function BoobooApp() {
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
-                      {categories.find((item) => item.key === post.category)?.label}
+                      {categoryLabels[post.category]}
                     </span>
                     <span className="text-xs text-[var(--ink-soft)]">
                       {post.createdAt} · {post.readMinutes}분
@@ -558,11 +588,10 @@ export function BoobooApp() {
               <article className="rounded-[8px] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(75,54,38,0.08)] xl:sticky xl:top-4 xl:self-start">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
-                    {categories.find((item) => item.key === selectedPost.category)?.label}
+                    {categoryLabels[selectedPost.category]}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-[var(--coral)]">
-                    <Thermometer className="size-3.5" />
-                    {selectedPost.temperature}도
+                  <span className="text-xs font-bold text-[var(--ink-soft)]">
+                    따뜻한 댓글 바래요
                   </span>
                 </div>
                 <h3 className="mt-4 font-serif text-3xl font-bold leading-tight">
@@ -610,13 +639,53 @@ export function BoobooApp() {
                   />
                 </div>
 
+                <section className="mt-5 rounded-[8px] border border-[var(--line)] bg-[#fbf6f0] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-sm font-extrabold">
+                      누가 더 잘못했나요?
+                    </h4>
+                    <span className="text-xs font-bold text-[var(--ink-soft)]">
+                      총{" "}
+                      {Object.values(selectedPost.verdicts ?? emptyVerdicts).reduce(
+                        (sum, count) => sum + count,
+                        0,
+                      )}
+                      표
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {verdictOptions.map((option) => {
+                      const value =
+                        (selectedPost.verdicts ?? emptyVerdicts)[option.key] ?? 0;
+
+                      return (
+                        <button
+                          key={option.key}
+                          onClick={() => voteVerdict(selectedPost.id, option.key)}
+                          className="rounded-[8px] border border-[var(--line)] bg-white p-3 text-left transition hover:border-[var(--plum)] hover:bg-white"
+                        >
+                          <span className="flex items-center justify-between gap-3">
+                            <strong className="text-sm">{option.label}</strong>
+                            <span className="font-serif text-xl font-bold">
+                              {value}
+                            </span>
+                          </span>
+                          <span className="mt-1 block text-xs leading-5 text-[var(--ink-soft)]">
+                            {option.description}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
                 <div className="mt-6 border-t border-[var(--line)] pt-5">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-extrabold">
                       댓글 {selectedPost.comments.length}
                     </h4>
                     <span className="text-xs text-[var(--ink-soft)]">
-                      조언보다 먼저 마음을 확인합니다
+                      따뜻한 댓글 바래요
                     </span>
                   </div>
                   <div className="mt-3 space-y-3">
@@ -671,6 +740,9 @@ export function BoobooApp() {
               <h2 className="text-sm font-extrabold">오늘의 부부 미션</h2>
               <Flame className="size-4 text-[var(--coral)]" />
             </div>
+            <p className="mb-3 text-sm leading-6 text-[var(--ink-soft)]">
+              하루에 하나만 해도 집 분위기가 조금 달라지는 행동을 모읍니다.
+            </p>
             <div className="space-y-3">
               {missions.map((mission) => {
                 const completed = completedMissions.includes(mission.id);
@@ -716,7 +788,7 @@ export function BoobooApp() {
               <Lock className="size-4 text-[#987000]" />
             </div>
             <div className="space-y-3">
-              {letters.map((letter) => (
+              {communityLetters.map((letter) => (
                 <div key={letter.id} className="rounded-[8px] bg-white/72 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <strong className="text-sm">{letter.title}</strong>
@@ -740,48 +812,24 @@ export function BoobooApp() {
               placeholder="배우자에게 차마 못 한 말을 적어두기"
             />
             <button
-              onClick={() => setLetterDraft("")}
+              onClick={submitLetter}
               className="mt-2 h-10 w-full rounded-[8px] bg-[#7a5b00] text-sm font-bold text-white"
             >
               익명으로 접어두기
             </button>
-          </section>
-
-          <section className="rounded-[8px] border border-[var(--line)] bg-[var(--paper)] p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-extrabold">회복 배지</h2>
-              <ShieldCheck className="size-4 text-[var(--leaf)]" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {badges.map((badge) => (
-                <div key={badge.label} className="rounded-[8px] bg-[#f7eee7] p-3">
-                  <p className="text-xs font-bold text-[var(--ink-soft)]">
-                    {badge.label}
-                  </p>
-                  <p className="mt-2 font-serif text-2xl font-bold">
-                    {badge.count}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[8px] border border-[var(--line)] bg-[#2d2930] p-4 text-white">
-            <div className="flex items-center gap-2">
-              <Users className="size-4 text-[#f7c948]" />
-              <h2 className="text-sm font-extrabold">운영 큐</h2>
-            </div>
-            <div className="mt-4 space-y-3 text-sm text-white/78">
-              <p>신고 2건 · 중재 필요 댓글 1건</p>
-              <p>신규 가입 승인 7명 · OAuth 연결 대기</p>
-              <p>booboo2 게시글 이관 매핑: 카테고리, 댓글, 배지 우선</p>
-            </div>
           </section>
         </aside>
       </section>
       <SiteFooter />
     </main>
   );
+}
+
+function visibleCategoryForPost(
+  category: Exclude<CategoryKey, "all">,
+): Exclude<CategoryKey, "all"> {
+  if (category === "tips" || category === "together") return "tips";
+  return "talk";
 }
 
 function ReactionButton({

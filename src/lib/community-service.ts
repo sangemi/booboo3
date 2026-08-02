@@ -1,19 +1,28 @@
 import {
   CommentTone,
+  LetterTone,
   PostCategory,
   ReactionType,
+  VerdictChoice,
 } from "@/generated/prisma/enums";
 import type {
   CommentModel,
   PostModel,
   ReactionModel,
+  VerdictVoteModel,
 } from "@/generated/prisma/models";
-import type { CommunityPost, ReactionState } from "@/lib/community-data";
+import type {
+  CommunityPost,
+  Letter,
+  ReactionState,
+  VerdictState,
+} from "@/lib/community-data";
 import { prisma } from "@/lib/db";
 
 type PostWithRelations = PostModel & {
   comments: CommentModel[];
   reactions: ReactionModel[];
+  verdictVotes: VerdictVoteModel[];
 };
 
 export const categoryToDb = {
@@ -60,6 +69,32 @@ const reactionFromDb = {
   [ReactionType.HELPFUL]: "helpful",
 } as const;
 
+export const verdictToDb = {
+  husband: VerdictChoice.HUSBAND,
+  wife: VerdictChoice.WIFE,
+  both: VerdictChoice.BOTH,
+  notEnough: VerdictChoice.NOT_ENOUGH,
+} as const;
+
+const verdictFromDb = {
+  [VerdictChoice.HUSBAND]: "husband",
+  [VerdictChoice.WIFE]: "wife",
+  [VerdictChoice.BOTH]: "both",
+  [VerdictChoice.NOT_ENOUGH]: "notEnough",
+} as const;
+
+const letterToneToDb = {
+  "고마움": LetterTone.THANKS,
+  "미안함": LetterTone.SORRY,
+  "서운함": LetterTone.HURT,
+} as const;
+
+const letterToneFromDb = {
+  [LetterTone.THANKS]: "고마움",
+  [LetterTone.SORRY]: "미안함",
+  [LetterTone.HURT]: "서운함",
+} as const;
+
 export async function listCommunityPosts() {
   const posts = await prisma.post.findMany({
     orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
@@ -68,6 +103,7 @@ export async function listCommunityPosts() {
         orderBy: { createdAt: "asc" },
       },
       reactions: true,
+      verdictVotes: true,
     },
     take: 50,
   });
@@ -98,6 +134,7 @@ export async function createCommunityPost(input: {
     include: {
       comments: true,
       reactions: true,
+      verdictVotes: true,
     },
   });
 
@@ -155,6 +192,91 @@ export async function createCommunityReaction(input: {
   );
 }
 
+export async function createCommunityVerdictVote(input: {
+  postId: string;
+  choice: keyof typeof verdictToDb;
+  anonKey?: string;
+}) {
+  await prisma.verdictVote.create({
+    data: {
+      postId: input.postId,
+      choice: verdictToDb[input.choice],
+      anonKey: input.anonKey,
+    },
+  });
+
+  const grouped = await prisma.verdictVote.groupBy({
+    by: ["choice"],
+    where: { postId: input.postId },
+    _count: { choice: true },
+  });
+
+  return grouped.reduce<VerdictState>(
+    (state, item) => {
+      state[verdictFromDb[item.choice]] = item._count.choice;
+      return state;
+    },
+    { husband: 0, wife: 0, both: 0, notEnough: 0 },
+  );
+}
+
+export async function completeCommunityMission(input: {
+  missionId: string;
+  reflection?: string;
+  anonKey?: string;
+}) {
+  return prisma.missionCompletion.create({
+    data: {
+      missionId: input.missionId,
+      reflection: input.reflection,
+      anonKey: input.anonKey,
+    },
+  });
+}
+
+export async function listAnonymousLetters(): Promise<Letter[]> {
+  const records = await prisma.anonymousLetter.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      replies: true,
+    },
+    take: 12,
+  });
+
+  return records.map((letter) => ({
+    id: letter.id,
+    title: letter.title,
+    body: letter.body,
+    replies: letter.replies.length,
+    tone: letterToneFromDb[letter.tone],
+  }));
+}
+
+export async function createAnonymousLetter(input: {
+  title: string;
+  body: string;
+  tone: keyof typeof letterToneToDb;
+}) {
+  const letter = await prisma.anonymousLetter.create({
+    data: {
+      title: input.title,
+      body: input.body,
+      tone: letterToneToDb[input.tone],
+    },
+    include: {
+      replies: true,
+    },
+  });
+
+  return {
+    id: letter.id,
+    title: letter.title,
+    body: letter.body,
+    replies: letter.replies.length,
+    tone: letterToneFromDb[letter.tone],
+  };
+}
+
 export async function createTemperatureCheck(input: {
   score: number;
   note?: string;
@@ -194,6 +316,13 @@ function toCommunityPost(post: PostWithRelations): CommunityPost {
         return state;
       },
       { meToo: 0, hug: 0, saved: 0, helpful: 0 },
+    ),
+    verdicts: post.verdictVotes.reduce<VerdictState>(
+      (state, vote) => {
+        state[verdictFromDb[vote.choice]] += 1;
+        return state;
+      },
+      { husband: 0, wife: 0, both: 0, notEnough: 0 },
     ),
     tags: post.tags,
     pinned: post.isPinned,

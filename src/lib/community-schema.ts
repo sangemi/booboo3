@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const createPostSchema = z.object({
-  category: z.enum(["talk", "worry", "tips", "parenting", "together", "letters"]),
+  category: z.enum(["talk", "tips"]),
   title: z.string().trim().min(2).max(120),
   body: z.string().trim().min(10).max(5000),
   temperature: z.number().int().min(1).max(100).optional(),
@@ -15,6 +15,20 @@ export const createCommentSchema = z.object({
 
 export const createReactionSchema = z.object({
   type: z.enum(["meToo", "hug", "saved", "helpful"]),
+});
+
+export const createVerdictVoteSchema = z.object({
+  choice: z.enum(["husband", "wife", "both", "notEnough"]),
+});
+
+export const createMissionCompletionSchema = z.object({
+  reflection: z.string().trim().max(800).optional(),
+});
+
+export const createLetterSchema = z.object({
+  title: z.string().trim().min(2).max(80),
+  body: z.string().trim().min(5).max(2000),
+  tone: z.enum(["고마움", "미안함", "서운함"]).default("서운함"),
 });
 
 export const createTemperatureCheckSchema = z.object({

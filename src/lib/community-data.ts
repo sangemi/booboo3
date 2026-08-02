@@ -22,6 +22,7 @@ export type CommunityPost = {
   readMinutes: number;
   comments: CommentItem[];
   reactions: ReactionState;
+  verdicts: VerdictState;
   tags: string[];
   pinned?: boolean;
 };
@@ -39,6 +40,13 @@ export type ReactionState = {
   hug: number;
   saved: number;
   helpful: number;
+};
+
+export type VerdictState = {
+  husband: number;
+  wife: number;
+  both: number;
+  notEnough: number;
 };
 
 export type Mission = {
@@ -63,13 +71,33 @@ export const categories: Array<{
   description: string;
 }> = [
   { key: "all", label: "전체", description: "지금 오가는 모든 이야기" },
-  { key: "talk", label: "부부톡", description: "일상, 칭찬, 소소한 사건" },
-  { key: "worry", label: "고민상담", description: "소통, 돈, 가족, 갈등" },
-  { key: "tips", label: "생활팁", description: "집안일, 기념일, 대화법" },
-  { key: "parenting", label: "육아톡", description: "아이와 함께 사는 리듬" },
-  { key: "together", label: "함께하는 시간", description: "데이트, 요리, 여행" },
-  { key: "letters", label: "익명편지", description: "차마 못 한 말" },
+  { key: "talk", label: "부부톡", description: "오늘 집에서 생긴 진짜 이야기" },
+  { key: "tips", label: "생활팁", description: "싸움을 줄이는 작은 방법" },
+  // 보류: 한 게시판이 제대로 활성화되면 다시 열 후보입니다.
+  // { key: "worry", label: "고민상담", description: "소통, 돈, 가족, 갈등" },
+  // { key: "parenting", label: "육아톡", description: "아이와 함께 사는 리듬" },
+  // { key: "together", label: "함께하는 시간", description: "데이트, 요리, 여행" },
+  // { key: "letters", label: "익명편지", description: "차마 못 한 말" },
+  // 보류: 판정 게시판이 충분히 커지면 여는 관점별 게시판 후보입니다.
+  // 남편 VS 아내 / 남편끼리 / 아내끼리
 ];
+
+export const categoryLabels: Record<CategoryKey, string> = {
+  all: "전체",
+  talk: "부부톡",
+  worry: "부부톡",
+  tips: "생활팁",
+  parenting: "부부톡",
+  together: "생활팁",
+  letters: "부부톡",
+};
+
+export const emptyVerdicts: VerdictState = {
+  husband: 0,
+  wife: 0,
+  both: 0,
+  notEnough: 0,
+};
 
 export const missions: Mission[] = [
   {
@@ -152,6 +180,7 @@ export const seedPosts: CommunityPost[] = [
     tags: ["퇴근", "육아", "집안일"],
     pinned: true,
     reactions: { meToo: 84, hug: 39, saved: 22, helpful: 17 },
+    verdicts: { husband: 14, wife: 22, both: 41, notEnough: 9 },
     comments: [
       {
         id: "c1",
@@ -183,6 +212,7 @@ export const seedPosts: CommunityPost[] = [
     readMinutes: 1,
     tags: ["칭찬", "일상"],
     reactions: { meToo: 152, hug: 24, saved: 11, helpful: 7 },
+    verdicts: { husband: 1, wife: 1, both: 8, notEnough: 3 },
     comments: [
       {
         id: "c3",
@@ -207,6 +237,7 @@ export const seedPosts: CommunityPost[] = [
     readMinutes: 4,
     tags: ["집안일", "대화법", "루틴"],
     reactions: { meToo: 97, hug: 18, saved: 64, helpful: 82 },
+    verdicts: { husband: 4, wife: 5, both: 17, notEnough: 6 },
     comments: [
       {
         id: "c4",
@@ -231,6 +262,7 @@ export const seedPosts: CommunityPost[] = [
     readMinutes: 2,
     tags: ["데이트", "요리", "기념일"],
     reactions: { meToo: 61, hug: 9, saved: 43, helpful: 25 },
+    verdicts: { husband: 0, wife: 0, both: 3, notEnough: 1 },
     comments: [],
   },
   {
@@ -247,6 +279,7 @@ export const seedPosts: CommunityPost[] = [
     readMinutes: 3,
     tags: ["육아", "사과", "갈등"],
     reactions: { meToo: 73, hug: 36, saved: 29, helpful: 31 },
+    verdicts: { husband: 3, wife: 6, both: 19, notEnough: 8 },
     comments: [
       {
         id: "c5",

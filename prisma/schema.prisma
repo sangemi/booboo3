@@ -35,6 +35,13 @@ enum LetterTone {
   HURT
 }
 
+enum VerdictChoice {
+  HUSBAND
+  WIFE
+  BOTH
+  NOT_ENOUGH
+}
+
 enum FeedbackStatus {
   OPEN
   REVIEWING
@@ -135,6 +142,7 @@ model Post {
   author             User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
   comments           Comment[]
   reactions          Reaction[]
+  verdictVotes       VerdictVote[]
   feedback           Feedback[]
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
@@ -180,6 +188,18 @@ model Reaction {
 
   @@unique([postId, type, userId])
   @@index([postId, type])
+}
+
+model VerdictVote {
+  id        String        @id @default(cuid())
+  choice    VerdictChoice
+  postId    String
+  anonKey   String?
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@index([postId, choice])
+  @@index([createdAt])
 }
 
 model TemperatureCheck {
