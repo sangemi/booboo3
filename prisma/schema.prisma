@@ -88,6 +88,20 @@ enum PersonaReviewStatus {
   CANCELLED
 }
 
+enum WalletAsset {
+  CASH
+  POINT
+}
+
+enum WalletTransactionType {
+  ADMIN_GRANT
+  PURCHASE
+  SPEND
+  REFUND
+  REWARD
+  ADJUSTMENT
+}
+
 model User {
   id                 String              @id @default(cuid())
   name               String?
@@ -98,6 +112,10 @@ model User {
   nickname           String?             @unique
   coupleStage        String?
   role               String              @default("MEMBER")
+  /// Paid virtual balance. Purchase flows can be connected later.
+  cashBalance        Int                 @default(0)
+  /// Free balance earned from community activity or events.
+  pointBalance       Int                 @default(0)
   accounts           Account[]
   sessions           Session[]
   personas           UserPersona[]
@@ -111,6 +129,9 @@ model User {
   letters            AnonymousLetter[]
   badges             UserBadge[]
   feedback           Feedback[]
+  walletTransactions WalletTransaction[] @relation("WalletOwner")
+  walletActions      WalletTransaction[] @relation("WalletActor")
+  adminActions       AdminActionLog[]     @relation("AdminActionActor")
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -424,4 +445,37 @@ model AiOperationEntry {
 
   @@index([happenedAt])
   @@index([source, status])
+}
+
+model WalletTransaction {
+  id           String                @id @default(cuid())
+  userId       String
+  actorId      String?
+  asset        WalletAsset
+  type         WalletTransactionType
+  amount       Int
+  balanceAfter Int
+  reason       String
+  user         User                  @relation("WalletOwner", fields: [userId], references: [id], onDelete: Cascade)
+  actor        User?                 @relation("WalletActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt    DateTime              @default(now())
+
+  @@index([userId, asset, createdAt])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+}
+
+model AdminActionLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  metadata   Json?
+  actor      User?    @relation("AdminActionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
 }

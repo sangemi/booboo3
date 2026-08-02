@@ -2,9 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { LogIn, Menu, Plus, Search, UserRound, X } from "lucide-react";
-import { useSession } from "next-auth/react";
-import { useState } from "react";
+import {
+  Bookmark,
+  ChevronDown,
+  LogIn,
+  LogOut,
+  Menu,
+  Plus,
+  Search,
+  ShieldCheck,
+  UserRound,
+  X,
+} from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
+import { useEffect, useRef, useState } from "react";
 
 import { VerifiedName } from "@/components/booboo/verified-name";
 import { cn } from "@/lib/utils";
@@ -28,8 +39,32 @@ export function SiteHeader({
   onWriteClick,
 }: SiteHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const { data: session, status } = useSession();
   const showCommunityActions = query !== undefined && onQueryChange && onWriteClick;
+
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const closeProfile = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+      if (
+        event instanceof MouseEvent &&
+        profileMenuRef.current?.contains(event.target as Node)
+      ) {
+        return;
+      }
+      setProfileOpen(false);
+    };
+
+    document.addEventListener("mousedown", closeProfile);
+    window.addEventListener("keydown", closeProfile);
+    return () => {
+      document.removeEventListener("mousedown", closeProfile);
+      window.removeEventListener("keydown", closeProfile);
+    };
+  }, [profileOpen]);
 
   return (
     <header className="border-b border-[var(--line)] bg-[rgba(255,250,246,0.9)] backdrop-blur">
@@ -93,17 +128,45 @@ export function SiteHeader({
           ) : null}
 
           {status === "authenticated" && session.user ? (
-            <Link
-              href="/mypage"
-              className="ml-1 flex h-10 max-w-36 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-white px-2.5 hover:bg-[#faf7f4]"
-            >
-              <UserRound className="size-4 shrink-0 text-[var(--plum)]" />
-              <VerifiedName
-                name={session.user.name || "마이페이지"}
-                verifiedCount={session.user.verifiedPersonaCount}
-                compact
-              />
-            </Link>
+            <div ref={profileMenuRef} className="relative ml-1">
+              <button
+                type="button"
+                onClick={() => setProfileOpen((value) => !value)}
+                className="flex h-10 max-w-40 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-white px-2.5 hover:bg-[#faf7f4]"
+                aria-expanded={profileOpen}
+                aria-haspopup="menu"
+              >
+                <UserRound className="size-4 shrink-0 text-[var(--plum)]" />
+                <VerifiedName
+                  name={session.user.name || "마이페이지"}
+                  verifiedCount={session.user.verifiedPersonaCount}
+                  compact
+                />
+                <ChevronDown className="size-3.5 shrink-0 text-[var(--ink-soft)]" />
+              </button>
+
+              {profileOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-12 z-50 w-48 overflow-hidden rounded-[8px] border border-[var(--line)] bg-white py-1 shadow-[0_16px_40px_rgba(44,41,38,0.16)]"
+                >
+                  <Link href="/mypage" onClick={() => setProfileOpen(false)} role="menuitem" className="flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-[#faf7f4]">
+                    <UserRound className="size-4 text-[var(--ink-soft)]" /> 내 프로필
+                  </Link>
+                  <Link href="/mypage/scraps" onClick={() => setProfileOpen(false)} role="menuitem" className="flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-[#faf7f4]">
+                    <Bookmark className="size-4 text-[var(--ink-soft)]" /> 내 스크랩
+                  </Link>
+                  {session.user.isAdmin ? (
+                    <Link href="/admin" onClick={() => setProfileOpen(false)} role="menuitem" className="flex items-center gap-2.5 border-t border-[var(--line)] px-3 py-2.5 text-sm font-bold text-[var(--plum)] hover:bg-[#f7eee7]">
+                      <ShieldCheck className="size-4" /> 관리자
+                    </Link>
+                  ) : null}
+                  <button type="button" onClick={() => signOut({ redirectTo: "/" })} role="menuitem" className="flex w-full items-center gap-2.5 border-t border-[var(--line)] px-3 py-2.5 text-left text-sm text-[var(--ink-soft)] hover:bg-[#faf7f4]">
+                    <LogOut className="size-4" /> 로그아웃
+                  </button>
+                </div>
+              ) : null}
+            </div>
           ) : status === "unauthenticated" ? (
             <Link
               href="/login"
@@ -152,6 +215,16 @@ export function SiteHeader({
               {session?.user ? <UserRound className="size-4" /> : <LogIn className="size-4" />}
               {session?.user ? "마이페이지" : "로그인"}
             </Link>
+            {session?.user?.isAdmin ? (
+              <Link
+                href="/admin"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 rounded-[8px] px-3 py-3 text-sm font-bold text-[var(--plum)]"
+              >
+                <ShieldCheck className="size-4" />
+                관리자
+              </Link>
+            ) : null}
           </nav>
 
           {showCommunityActions ? (

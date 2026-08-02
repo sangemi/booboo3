@@ -2,8 +2,10 @@
 
 import {
   BadgeCheck,
+  Banknote,
   Eye,
   EyeOff,
+  Gift,
   LoaderCircle,
   LockKeyhole,
   LogOut,
@@ -40,6 +42,8 @@ type Profile = {
   email: string | null;
   image: string | null;
   nickname: string | null;
+  cashBalance: number;
+  pointBalance: number;
   providers: string[];
   personas: Persona[];
   verifiedPersonaCount: number;
@@ -279,6 +283,28 @@ export function ProfileManager() {
             </p>
 
             <AccountNavigation active="profile" />
+
+            <div className="mt-6 border-t border-[var(--line)] pt-5">
+              <p className="text-xs font-bold text-[var(--ink-soft)]">내 재화</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-[6px] border border-[var(--line)] bg-white px-3 py-3">
+                  <Banknote className="size-4 text-[var(--plum)]" />
+                  <p className="mt-2 text-xs text-[var(--ink-soft)]">캐시</p>
+                  <p className="mt-0.5 text-sm font-bold">
+                    {profile.cashBalance.toLocaleString()} C
+                  </p>
+                  <p className="mt-1 text-[10px] text-[var(--ink-soft)]">유료 재화</p>
+                </div>
+                <div className="rounded-[6px] border border-[var(--line)] bg-white px-3 py-3">
+                  <Gift className="size-4 text-[var(--leaf)]" />
+                  <p className="mt-2 text-xs text-[var(--ink-soft)]">포인트</p>
+                  <p className="mt-0.5 text-sm font-bold">
+                    {profile.pointBalance.toLocaleString()} P
+                  </p>
+                  <p className="mt-1 text-[10px] text-[var(--ink-soft)]">무료 보상</p>
+                </div>
+              </div>
+            </div>
 
             <div className="mt-6 border-t border-[var(--line)] pt-5">
               <p className="text-xs font-bold text-[var(--ink-soft)]">연결된 로그인</p>

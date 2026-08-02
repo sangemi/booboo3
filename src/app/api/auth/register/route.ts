@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { PersonaType } from "@/generated/prisma/enums";
+import { isAdminEmail } from "@/lib/admin-access";
 import { prisma } from "@/lib/db";
 import { normalizePersonaValue, personaLabels } from "@/lib/persona";
 
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
         name: nickname,
         nickname,
         passwordHash,
+        role: isAdminEmail(email) ? "ADMIN" : "MEMBER",
         personas: gender
           ? {
               create: {

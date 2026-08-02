@@ -25,6 +25,8 @@ export async function GET() {
       email: true,
       image: true,
       nickname: true,
+      cashBalance: true,
+      pointBalance: true,
       accounts: { select: { provider: true } },
       personas: {
         orderBy: [{ status: "desc" }, { createdAt: "asc" }],

@@ -5,6 +5,7 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import Kakao from "next-auth/providers/kakao";
 
+import { isAdminEmail } from "@/lib/admin-access";
 import { prisma } from "@/lib/db";
 import { syncSocialPersonas } from "@/lib/persona";
 
@@ -72,7 +73,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           where: { id: token.sub },
           select: {
             name: true,
+            email: true,
             nickname: true,
+            role: true,
             image: true,
             _count: {
               select: {
@@ -84,7 +87,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (profile) {
           token.name = profile.nickname ?? profile.name;
+          token.email = profile.email;
           token.picture = profile.image;
+          token.isAdmin = isAdminEmail(profile.email);
           token.verifiedPersonaCount = profile._count.personas;
         }
       }
@@ -98,6 +103,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           typeof token.verifiedPersonaCount === "number"
             ? token.verifiedPersonaCount
             : 0;
+        session.user.isAdmin = token.isAdmin === true;
       }
 
       return session;
@@ -105,7 +111,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   events: {
     async signIn({ user, account, profile }) {
-      if (!user.id || !account || account.provider === "credentials") return;
+      if (!user.id) return;
+
+      if (isAdminEmail(user.email)) {
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { role: "ADMIN" },
+          });
+        } catch (error) {
+          console.error("[auth] admin role sync failed", error);
+        }
+      }
+
+      if (!account || account.provider === "credentials") return;
 
       try {
         await syncSocialPersonas({
