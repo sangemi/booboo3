@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   title: "부부라이프 | 우리 부부 이야기",
   description:
     "결혼생활, 부부소통, 육아, 데이트 이야기를 나누는 따뜻한 커뮤니티",
+  icons: {
+    icon: [{ url: "/icon.svg?v=1", type: "image/svg+xml" }],
+    shortcut: "/icon.svg?v=1",
+  },
 };
 
 export default function RootLayout({

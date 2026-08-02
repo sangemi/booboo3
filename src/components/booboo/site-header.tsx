@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, LogIn, Menu, Plus, Search, UserRound, X } from "lucide-react";
+import { LogIn, Menu, Plus, Search, UserRound, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 
@@ -34,8 +34,13 @@ export function SiteHeader({
     <header className="border-b border-[var(--line)] bg-[rgba(255,250,246,0.9)] backdrop-blur">
       <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-4 px-4 py-3 md:px-8">
         <Link href="/" className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-[8px] bg-[var(--plum)] text-white">
-            <Heart className="size-5" />
+          <div className="grid size-10 place-items-center rounded-[8px] border border-[rgba(111,61,91,0.2)] bg-[#fffdfb] shadow-[0_3px_12px_rgba(76,40,61,0.08)]">
+            <span
+              aria-hidden="true"
+              className="-translate-y-px font-serif text-[28px] leading-none text-[var(--plum)]"
+            >
+              ♥
+            </span>
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--leaf)]">
