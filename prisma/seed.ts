@@ -12,6 +12,7 @@ import { prisma } from "../src/lib/db";
 
 const categoryToDb = {
   talk: PostCategory.TALK,
+  verdict: PostCategory.VERDICT,
   worry: PostCategory.WORRY,
   tips: PostCategory.TIPS,
   parenting: PostCategory.PARENTING,

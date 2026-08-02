@@ -155,7 +155,7 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
   }, [activeCategory, posts, query]);
 
   const selectedPost =
-    posts.find((post) => post.id === selectedPostId) ?? filteredPosts[0] ?? posts[0];
+    filteredPosts.find((post) => post.id === selectedPostId) ?? filteredPosts[0];
   const selectedLetter = communityLetters.find(
     (letter) => letter.id === selectedLetterId,
   );
@@ -205,6 +205,13 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
     const categoryQuery =
       activeCategory === "all" ? "" : `?category=${activeCategory}`;
     return `/talk/post/${publicId}${categoryQuery}`;
+  }
+
+  function selectCategory(category: CategoryKey) {
+    setActiveCategory(category);
+    if (category !== "all") {
+      setNewPost((current) => ({ ...current, category }));
+    }
   }
 
   function moveSelectedPost(direction: -1 | 1) {
@@ -301,19 +308,11 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
   }
 
   async function voteVerdict(postId: string, choice: keyof VerdictState) {
-    setPosts((current) =>
-      current.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              verdicts: {
-                ...(post.verdicts ?? emptyVerdicts),
-                [choice]: (post.verdicts?.[choice] ?? 0) + 1,
-              },
-            }
-          : post,
-      ),
-    );
+    if (!session?.user) {
+      const callbackUrl = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      return;
+    }
 
     try {
       const response = await fetch(`/api/community/posts/${postId}/verdicts`, {
@@ -325,12 +324,19 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
 
       const payload = (await response.json()) as {
         verdicts?: VerdictState;
+        myVerdict?: keyof VerdictState;
       };
-      if (!payload.verdicts) return;
+      if (!payload.verdicts || !payload.myVerdict) return;
 
       setPosts((current) =>
         current.map((post) =>
-          post.id === postId ? { ...post, verdicts: payload.verdicts! } : post,
+          post.id === postId
+            ? {
+                ...post,
+                verdicts: payload.verdicts!,
+                myVerdict: payload.myVerdict,
+              }
+            : post,
         ),
       );
     } catch {
@@ -505,7 +511,9 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
               return (
                 <button
                   key={category.key}
-                  onClick={() => setActiveCategory(category.key)}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => selectCategory(category.key)}
                   className={cn(
                     "h-10 shrink-0 rounded-[6px] px-4 text-sm font-bold transition",
                     active
@@ -614,6 +622,11 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
 
           <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
             <div className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
+              {filteredPosts.length === 0 ? (
+                <p className="px-4 py-10 text-center text-sm text-[var(--ink-soft)]">
+                  아직 올라온 글이 없습니다.
+                </p>
+              ) : null}
               {filteredPosts.map((post) => {
                 const selected = selectedPost?.id === post.id;
 
@@ -724,45 +737,13 @@ export function BoobooApp({ initialPost, initialCategory }: BoobooAppProps = {})
                   />
                 </div>
 
-                <section className="mt-5 rounded-[8px] border border-[var(--line)] bg-[#fbf6f0] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-sm font-extrabold">
-                      누가 더 잘못했나요?
-                    </h4>
-                    <span className="text-xs font-bold text-[var(--ink-soft)]">
-                      총{" "}
-                      {Object.values(selectedPost.verdicts ?? emptyVerdicts).reduce(
-                        (sum, count) => sum + count,
-                        0,
-                      )}
-                      표
-                    </span>
-                  </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {verdictOptions.map((option) => {
-                      const value =
-                        (selectedPost.verdicts ?? emptyVerdicts)[option.key] ?? 0;
-
-                      return (
-                        <button
-                          key={option.key}
-                          onClick={() => voteVerdict(selectedPost.id, option.key)}
-                          className="rounded-[8px] border border-[var(--line)] bg-white p-3 text-left transition hover:border-[var(--plum)] hover:bg-white"
-                        >
-                          <span className="flex items-center justify-between gap-3">
-                            <strong className="text-sm">{option.label}</strong>
-                            <span className="font-serif text-xl font-bold">
-                              {value}
-                            </span>
-                          </span>
-                          <span className="mt-1 block text-xs leading-5 text-[var(--ink-soft)]">
-                            {option.description}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
+                {selectedPost.category === "verdict" ? (
+                  <VerdictPanel
+                    post={selectedPost}
+                    canVote={Boolean(session?.user)}
+                    onVerdict={(choice) => voteVerdict(selectedPost.id, choice)}
+                  />
+                ) : null}
 
                 <div className="mt-6 border-t border-[var(--line)] pt-5">
                   <div className="flex items-center justify-between">
@@ -1064,9 +1045,72 @@ function LetterReactionButton({
   );
 }
 
+function VerdictPanel({
+  post,
+  canVote,
+  onVerdict,
+}: {
+  post: CommunityPost;
+  canVote: boolean;
+  onVerdict: (choice: keyof VerdictState) => void;
+}) {
+  const verdicts = post.verdicts ?? emptyVerdicts;
+  const total = Object.values(verdicts).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
+
+  return (
+    <section className="mt-5 rounded-[8px] border border-[var(--line)] bg-[#fbf6f0] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-extrabold">누가 더 잘못했나요?</h4>
+        <span className="text-xs font-bold text-[var(--ink-soft)]">
+          계정당 한 표 · 총 {total}표
+        </span>
+      </div>
+      {!canVote ? (
+        <p className="mt-2 text-xs text-[var(--ink-soft)]">
+          투표하려면 로그인이 필요합니다.
+        </p>
+      ) : null}
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {verdictOptions.map((option) => {
+          const selected = post.myVerdict === option.key;
+
+          return (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onVerdict(option.key)}
+              className={cn(
+                "rounded-[8px] border bg-white p-3 text-left transition hover:border-[var(--plum)]",
+                selected
+                  ? "border-[var(--plum)] ring-2 ring-[rgba(111,61,91,0.12)]"
+                  : "border-[var(--line)]",
+              )}
+            >
+              <span className="flex items-center justify-between gap-3">
+                <strong className="text-sm">{option.label}</strong>
+                <span className="font-serif text-xl font-bold">
+                  {verdicts[option.key] ?? 0}
+                </span>
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-[var(--ink-soft)]">
+                {option.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function visibleCategoryForPost(
   category: Exclude<CategoryKey, "all">,
 ): Exclude<CategoryKey, "all"> {
+  if (category === "verdict") return "verdict";
   if (category === "tips" || category === "together") return "tips";
   return "talk";
 }
@@ -1151,40 +1195,13 @@ function MobilePostDetail({
         />
       </div>
 
-      <section className="mt-5 rounded-[8px] border border-[var(--line)] bg-[#fbf6f0] p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-sm font-extrabold">누가 더 잘못했나요?</h4>
-          <span className="text-xs font-bold text-[var(--ink-soft)]">
-            총{" "}
-            {Object.values(post.verdicts ?? emptyVerdicts).reduce(
-              (sum, count) => sum + count,
-              0,
-            )}
-            표
-          </span>
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {verdictOptions.map((option) => {
-            const value = (post.verdicts ?? emptyVerdicts)[option.key] ?? 0;
-
-            return (
-              <button
-                key={option.key}
-                onClick={() => onVerdict(option.key)}
-                className="rounded-[8px] border border-[var(--line)] bg-white p-3 text-left transition hover:border-[var(--plum)] hover:bg-white"
-              >
-                <span className="flex items-center justify-between gap-3">
-                  <strong className="text-sm">{option.label}</strong>
-                  <span className="font-serif text-xl font-bold">{value}</span>
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-[var(--ink-soft)]">
-                  {option.description}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {post.category === "verdict" ? (
+        <VerdictPanel
+          post={post}
+          canVote={canUseName}
+          onVerdict={onVerdict}
+        />
+      ) : null}
 
       <div className="mt-6 border-t border-[var(--line)] pt-5">
         <div className="flex items-center justify-between">

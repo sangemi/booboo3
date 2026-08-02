@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const createPostSchema = z.object({
-  category: z.enum(["talk", "tips"]),
+  category: z.enum(["talk", "verdict", "tips"]),
   title: z.string().trim().min(2).max(120),
   body: z.string().trim().min(10).max(5000),
   temperature: z.number().int().min(1).max(100).optional(),

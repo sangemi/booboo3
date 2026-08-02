@@ -9,6 +9,7 @@ datasource db {
 
 enum PostCategory {
   TALK
+  VERDICT
   WORRY
   TIPS
   PARENTING
@@ -103,6 +104,7 @@ model User {
   posts              Post[]
   comments           Comment[]
   reactions          Reaction[]
+  verdictVotes       VerdictVote[]
   temperatureChecks  TemperatureCheck[]
   missionCompletions MissionCompletion[]
   letters            AnonymousLetter[]
@@ -274,11 +276,16 @@ model VerdictVote {
   id        String        @id @default(cuid())
   choice    VerdictChoice
   postId    String
+  userId    String?
+  /// Legacy anonymous votes. New votes require an authenticated userId.
   anonKey   String?
   post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime      @default(now())
 
+  @@unique([postId, userId])
   @@index([postId, choice])
+  @@index([userId])
   @@index([createdAt])
 }
 

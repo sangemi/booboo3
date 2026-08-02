@@ -7,7 +7,8 @@ import { createCommunityPost, listCommunityPosts } from "@/lib/community-service
 
 export async function GET() {
   try {
-    const posts = await listCommunityPosts();
+    const session = await auth();
+    const posts = await listCommunityPosts(session?.user?.id);
     return NextResponse.json({
       posts: posts.length > 0 ? posts : seedPosts,
       source: posts.length > 0 ? "database" : "seed",

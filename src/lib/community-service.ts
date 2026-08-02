@@ -51,6 +51,7 @@ const authorSelect = {
 
 export const categoryToDb = {
   talk: PostCategory.TALK,
+  verdict: PostCategory.VERDICT,
   worry: PostCategory.WORRY,
   tips: PostCategory.TIPS,
   parenting: PostCategory.PARENTING,
@@ -60,6 +61,7 @@ export const categoryToDb = {
 
 export const categoryFromDb = {
   [PostCategory.TALK]: "talk",
+  [PostCategory.VERDICT]: "verdict",
   [PostCategory.WORRY]: "worry",
   [PostCategory.TIPS]: "tips",
   [PostCategory.PARENTING]: "parenting",
@@ -121,7 +123,7 @@ type LetterWithReactions = AnonymousLetterModel & {
   reactions: LetterReactionModel[];
 };
 
-export async function listCommunityPosts() {
+export async function listCommunityPosts(userId?: string) {
   const posts = await prisma.post.findMany({
     orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
     include: {
@@ -136,10 +138,13 @@ export async function listCommunityPosts() {
     take: 50,
   });
 
-  return posts.map(toCommunityPost);
+  return posts.map((post) => toCommunityPost(post, userId));
 }
 
-export async function getCommunityPostByPublicId(publicId: number) {
+export async function getCommunityPostByPublicId(
+  publicId: number,
+  userId?: string,
+) {
   if (!Number.isSafeInteger(publicId) || publicId < 1) return null;
 
   const post = await prisma.post.findUnique({
@@ -155,7 +160,7 @@ export async function getCommunityPostByPublicId(publicId: number) {
     },
   });
 
-  return post ? toCommunityPost(post) : null;
+  return post ? toCommunityPost(post, userId) : null;
 }
 
 export async function createCommunityPost(input: {
@@ -274,15 +279,28 @@ export async function createCommunityReaction(input: {
 
 export async function createCommunityVerdictVote(input: {
   postId: string;
+  userId: string;
   choice: keyof typeof verdictToDb;
-  anonKey?: string;
 }) {
-  await prisma.verdictVote.create({
-    data: {
-      postId: input.postId,
-      choice: verdictToDb[input.choice],
-      anonKey: input.anonKey,
+  const post = await prisma.post.findUnique({
+    where: { id: input.postId },
+    select: { category: true },
+  });
+  if (post?.category !== PostCategory.VERDICT) return null;
+
+  await prisma.verdictVote.upsert({
+    where: {
+      postId_userId: {
+        postId: input.postId,
+        userId: input.userId,
+      },
     },
+    create: {
+      postId: input.postId,
+      userId: input.userId,
+      choice: verdictToDb[input.choice],
+    },
+    update: { choice: verdictToDb[input.choice] },
   });
 
   const grouped = await prisma.verdictVote.groupBy({
@@ -291,13 +309,15 @@ export async function createCommunityVerdictVote(input: {
     _count: { choice: true },
   });
 
-  return grouped.reduce<VerdictState>(
+  const verdicts = grouped.reduce<VerdictState>(
     (state, item) => {
       state[verdictFromDb[item.choice]] = item._count.choice;
       return state;
     },
     { husband: 0, wife: 0, both: 0, notEnough: 0 },
   );
+
+  return { verdicts, myVerdict: input.choice };
 }
 
 export async function completeCommunityMission(input: {
@@ -441,7 +461,14 @@ export async function createTemperatureCheck(input: {
   });
 }
 
-function toCommunityPost(post: PostWithRelations): CommunityPost {
+function toCommunityPost(
+  post: PostWithRelations,
+  currentUserId?: string,
+): CommunityPost {
+  const ownVerdict = currentUserId
+    ? post.verdictVotes.find((vote) => vote.userId === currentUserId)
+    : undefined;
+
   return {
     id: post.id,
     publicId: post.publicId,
@@ -485,6 +512,7 @@ function toCommunityPost(post: PostWithRelations): CommunityPost {
       },
       { husband: 0, wife: 0, both: 0, notEnough: 0 },
     ),
+    myVerdict: ownVerdict ? verdictFromDb[ownVerdict.choice] : null,
     tags: post.tags,
     pinned: post.isPinned,
   };

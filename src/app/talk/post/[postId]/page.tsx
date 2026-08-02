@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { auth } from "@/auth";
 import { BoobooApp } from "@/components/booboo/booboo-app";
 import type { CategoryKey } from "@/lib/community-data";
 import { getCommunityPostByPublicId } from "@/lib/community-service";
@@ -34,7 +35,11 @@ export async function generateMetadata({
 export default async function PostPage({ params, searchParams }: PostPageProps) {
   const { postId } = await params;
   const { category } = await searchParams;
-  const post = await getCommunityPostByPublicId(Number(postId));
+  const session = await auth();
+  const post = await getCommunityPostByPublicId(
+    Number(postId),
+    session?.user?.id,
+  );
 
   if (!post) notFound();
 
@@ -48,5 +53,7 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
 
 function normalizeCategory(value?: string | string[]): CategoryKey {
   const category = Array.isArray(value) ? value[0] : value;
-  return category === "talk" || category === "tips" ? category : "all";
+  return category === "talk" || category === "verdict" || category === "tips"
+    ? category
+    : "all";
 }
