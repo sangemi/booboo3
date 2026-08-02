@@ -69,9 +69,6 @@ export function BoobooApp() {
   });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [letterDraft, setLetterDraft] = useState("");
-  const [dataSource, setDataSource] = useState<"seed" | "database" | "local">(
-    "seed",
-  );
   const [savingTemperature, setSavingTemperature] = useState(false);
 
   useEffect(() => {
@@ -92,9 +89,8 @@ export function BoobooApp() {
         if (!active || !payload.posts?.length) return;
         setPosts(payload.posts);
         setSelectedPostId(payload.posts[0].id);
-        setDataSource(payload.source ?? "database");
       } catch {
-        setDataSource("local");
+        return;
       }
     }
 
@@ -165,9 +161,8 @@ export function BoobooApp() {
           post.id === postId ? { ...post, reactions: payload.reactions! } : post,
         ),
       );
-      setDataSource("database");
     } catch {
-      setDataSource("local");
+      return;
     }
   }
 
@@ -210,17 +205,14 @@ export function BoobooApp() {
         if (payload.post) {
           setPosts((current) => [payload.post!, ...current]);
           setSelectedPostId(payload.post.id);
-          setDataSource("database");
         }
       } else {
         setPosts((current) => [post, ...current]);
         setSelectedPostId(post.id);
-        setDataSource("local");
       }
     } catch {
       setPosts((current) => [post, ...current]);
       setSelectedPostId(post.id);
-      setDataSource("local");
     }
 
     setNewPost({ title: "", body: "", category: "talk" });
@@ -252,12 +244,11 @@ export function BoobooApp() {
             ),
           );
           setCommentDrafts((current) => ({ ...current, [postId]: "" }));
-          setDataSource("database");
           return;
         }
       }
     } catch {
-      setDataSource("local");
+      // Keep the optimistic local comment when the network write fails.
     }
 
     setPosts((current) =>
@@ -285,14 +276,13 @@ export function BoobooApp() {
   async function saveTemperature() {
     setSavingTemperature(true);
     try {
-      const response = await fetch("/api/community/temperature", {
+      await fetch("/api/community/temperature", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ score: temperature }),
       });
-      setDataSource(response.ok ? "database" : "local");
     } catch {
-      setDataSource("local");
+      return;
     } finally {
       setSavingTemperature(false);
     }
@@ -450,14 +440,6 @@ export function BoobooApp() {
                   ))}
                 </div>
               </div>
-            </div>
-            <div className="border-t border-[var(--line)] px-5 py-3 text-xs font-bold text-[var(--ink-soft)] md:px-7">
-              데이터 상태:{" "}
-              {dataSource === "database"
-                ? "PostgreSQL 연결"
-                : dataSource === "local"
-                  ? "로컬 임시 반영"
-                  : "시드 데이터"}
             </div>
           </div>
 
