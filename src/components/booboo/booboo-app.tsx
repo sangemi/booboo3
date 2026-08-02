@@ -8,8 +8,6 @@ import {
   Home,
   Lock,
   MessageCircle,
-  Plus,
-  Search,
   Send,
   Smile,
   Sparkles,
@@ -30,6 +28,7 @@ import {
 } from "@/lib/community-data";
 import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/booboo/site-footer";
+import { SiteHeader } from "@/components/booboo/site-header";
 
 const categoryIcons: Partial<
   Record<CategoryKey, React.ComponentType<{ className?: string }>>
@@ -369,42 +368,12 @@ export function BoobooApp() {
 
   return (
     <main className="min-h-screen bg-[var(--background)]">
-      <header className="border-b border-[var(--line)] bg-[rgba(255,250,246,0.86)] backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 py-4 md:px-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-[8px] bg-[var(--plum)] text-white">
-              <Heart className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--leaf)]">
-                Booboo Life
-              </p>
-              <h1 className="font-serif text-2xl font-bold leading-tight">
-                부부라이프
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex flex-1 flex-col gap-3 lg:max-w-2xl lg:flex-row lg:items-center">
-            <label className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-soft)]" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="h-11 w-full rounded-[8px] border border-[var(--line)] bg-white pl-10 pr-4 text-sm outline-none transition focus:border-[var(--plum)] focus:ring-4 focus:ring-[rgba(111,61,91,0.12)]"
-                placeholder="퇴근, 집안일, 기념일, 사과..."
-              />
-            </label>
-            <button
-              onClick={() => setComposerOpen((value) => !value)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] bg-[var(--coral)] px-4 text-sm font-bold text-white shadow-[0_10px_28px_rgba(255,111,97,0.22)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[rgba(255,111,97,0.24)]"
-            >
-              <Plus className="size-4" />
-              글쓰기
-            </button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        active="community"
+        query={query}
+        onQueryChange={setQuery}
+        onWriteClick={() => setComposerOpen((value) => !value)}
+      />
 
       <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 md:px-8 lg:grid-cols-[240px_minmax(0,1fr)_360px]">
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
@@ -443,33 +412,22 @@ export function BoobooApp() {
         </aside>
 
         <section className="min-w-0 space-y-4">
-          <div className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--paper)]">
-            <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
-              <div className="p-5 md:p-7">
-                <p className="mb-3 inline-flex items-center gap-2 rounded-[6px] bg-[#f4ebe3] px-3 py-1 text-xs font-bold text-[var(--plum)]">
+          <div className="rounded-[8px] border border-[var(--line)] bg-[var(--paper)] px-4 py-3 md:px-5">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="inline-flex items-center gap-2 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 text-[11px] font-bold text-[var(--plum)]">
                   <Sparkles className="size-3.5" />
-                  오늘의 커뮤니티
+                  부부라이프
                 </p>
-                <h2 className="max-w-2xl font-serif text-4xl font-bold leading-tight md:text-5xl">
-                  비난을 줄이고, 회복을 남기는 부부 대화장
-                </h2>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)] md:text-base">
-                  오늘 집에서 생긴 일을 올리고, 비슷한 하루를 살아본 사람들이
-                  따뜻한 댓글과 판정으로 함께 정리합니다.
+                <p className="mt-2 text-sm font-bold leading-6 md:text-base">
+                  잘 사는 부부에게는 배움을, 다투는 부부에게는 건강한 싸움의
+                  연습을.
                 </p>
               </div>
-              <div className="border-t border-[var(--line)] bg-[#f7eee7] p-5 lg:border-l lg:border-t-0">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--leaf)]">
-                  Verdict
-                </p>
-                <h3 className="mt-3 font-serif text-3xl font-bold leading-tight">
-                  누가 더 잘못했나요?
-                </h3>
-                <p className="mt-3 text-sm leading-6 text-[var(--ink-soft)]">
-                  싸움 글에는 네 가지 판정만 받습니다. 남편 쪽, 아내 쪽, 둘 다,
-                  정보 부족.
-                </p>
-              </div>
+              <p className="max-w-xl text-xs leading-5 text-[var(--ink-soft)] md:text-right">
+                보통 부부의 일상을 나누고, 싸움은 비난보다 회복 쪽으로
+                정리합니다.
+              </p>
             </div>
           </div>
 
