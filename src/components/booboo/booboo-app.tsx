@@ -587,11 +587,12 @@ export function BoobooApp({
         query={query}
         onQueryChange={setQuery}
         onWriteClick={() => setComposerOpen((value) => !value)}
+        muted
       />
 
       <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 md:px-8 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_280px]">
         <section className="min-w-0 space-y-4">
-          <div className="rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] px-4 py-3 text-[#6f6964] md:px-5">
+          <div className="rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] px-4 py-3 text-[#6f6964] opacity-80 transition-opacity duration-200 hover:opacity-100 md:px-5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-6 md:text-base">
               <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 text-[11px] font-bold text-[var(--plum)]">
                 <Sparkles className="size-3.5" />
@@ -605,7 +606,7 @@ export function BoobooApp({
             </p>
           </div>
 
-          <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] p-1 opacity-80 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {categories.map((category) => {
               const active = activeCategory === category.key;
 
@@ -722,7 +723,7 @@ export function BoobooApp({
           ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="overflow-hidden rounded-[8px] border border-[#ebe3dc] bg-[#fffdfa]">
+            <div className="overflow-hidden rounded-[8px] border border-[#ebe3dc] bg-[#fffdfa] opacity-80 transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100">
               {filteredPosts.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-sm text-[var(--ink-soft)]">
@@ -796,15 +797,15 @@ export function BoobooApp({
 
             {selectedPost ? (
               <article className="hidden rounded-[8px] border border-[#ddd2c9] bg-white p-6 shadow-[0_20px_56px_rgba(55,42,32,0.12)] xl:sticky xl:top-4 xl:block xl:self-start">
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 opacity-60">
                   <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
                     {categoryLabels[selectedPost.category]}
                   </span>
                 </div>
-                <h3 className="mt-4 font-serif text-4xl font-bold leading-[1.28] text-[var(--foreground)]">
+                <h3 className="mt-4 font-serif text-[42px] font-bold leading-[1.24] text-[var(--foreground)]">
                   {selectedPost.title}
                 </h3>
-                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 opacity-65">
                   <VerifiedName
                     name={selectedPost.author}
                     verifiedCount={selectedPost.authorVerifiedPersonaCount ?? 0}
@@ -814,35 +815,39 @@ export function BoobooApp({
                     · {selectedPost.createdAt}
                   </span>
                 </div>
-                <p className="mt-5 whitespace-pre-line text-[15px] leading-8 text-[#3f3a36]">
+                <p className="mt-6 whitespace-pre-line text-[17px] leading-9 text-[#312d2a]">
                   {selectedPost.body}
                 </p>
 
-                <div className="mt-5 flex flex-wrap gap-2">
+                <div className="mt-5 flex flex-wrap gap-1.5 opacity-55 transition-opacity duration-200 hover:opacity-90">
                   {selectedPost.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-[6px] border border-[var(--line)] px-2 py-1 text-xs font-bold text-[var(--ink-soft)]"
+                      className="rounded-[6px] border border-[var(--line)] px-1.5 py-0.5 text-[11px] font-bold text-[var(--ink-soft)]"
                     >
                       #{tag}
                     </span>
                   ))}
                 </div>
 
-                <PostActions
-                  post={selectedPost}
-                  onReact={(type) => reactToPost(selectedPost.id, type)}
-                />
+                <div className="opacity-60 transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100">
+                  <PostActions
+                    post={selectedPost}
+                    onReact={(type) => reactToPost(selectedPost.id, type)}
+                  />
+                </div>
 
                 {selectedPost.category === "verdict" ? (
-                  <VerdictPanel
-                    post={selectedPost}
-                    canVote={Boolean(session?.user)}
-                    onVerdict={(choice) => voteVerdict(selectedPost.id, choice)}
-                  />
+                  <div className="opacity-75 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100">
+                    <VerdictPanel
+                      post={selectedPost}
+                      canVote={Boolean(session?.user)}
+                      onVerdict={(choice) => voteVerdict(selectedPost.id, choice)}
+                    />
+                  </div>
                 ) : null}
 
-                <div className="mt-6 border-t border-[var(--line)] pt-5">
+                <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-extrabold">
                       댓글 {selectedPost.comments.length}
@@ -922,7 +927,7 @@ export function BoobooApp({
           </div>
         </section>
 
-        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+        <aside className="space-y-4 opacity-[0.78] transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100 lg:sticky lg:top-4 lg:self-start">
           <section className="rounded-[8px] border border-[#ebe3dc] bg-[#fcfaf8] p-4 text-[#716b66]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-extrabold">오늘의 부부 미션</h2>
@@ -1365,15 +1370,15 @@ function MobilePostDetail({
 }) {
   return (
     <article className="rounded-[8px] border border-[#ddd2c9] bg-white p-5 shadow-[0_20px_56px_rgba(55,42,32,0.12)]">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 opacity-60">
         <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
           {categoryLabels[post.category]}
         </span>
       </div>
-      <h3 className="mt-4 font-serif text-3xl font-bold leading-[1.3] text-[var(--foreground)]">
+      <h3 className="mt-4 font-serif text-[34px] font-bold leading-[1.26] text-[var(--foreground)]">
         {post.title}
       </h3>
-      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 opacity-65">
         <VerifiedName
           name={post.author}
           verifiedCount={post.authorVerifiedPersonaCount ?? 0}
@@ -1381,32 +1386,36 @@ function MobilePostDetail({
         />
         <span className="text-xs text-[var(--ink-soft)]">· {post.createdAt}</span>
       </div>
-      <p className="mt-5 whitespace-pre-line text-[15px] leading-8 text-[#3f3a36]">
+      <p className="mt-6 whitespace-pre-line text-base leading-8 text-[#312d2a]">
         {post.body}
       </p>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-1.5 opacity-55">
         {post.tags.map((tag) => (
           <span
             key={tag}
-            className="rounded-[6px] border border-[var(--line)] px-2 py-1 text-xs font-bold text-[var(--ink-soft)]"
+            className="rounded-[6px] border border-[var(--line)] px-1.5 py-0.5 text-[11px] font-bold text-[var(--ink-soft)]"
           >
             #{tag}
           </span>
         ))}
       </div>
 
-      <PostActions post={post} onReact={onReact} />
+      <div className="opacity-60 transition-opacity duration-200 focus-within:opacity-100">
+        <PostActions post={post} onReact={onReact} />
+      </div>
 
       {post.category === "verdict" ? (
-        <VerdictPanel
-          post={post}
-          canVote={canUseName}
-          onVerdict={onVerdict}
-        />
+        <div className="opacity-75 transition-opacity duration-200 focus-within:opacity-100">
+          <VerdictPanel
+            post={post}
+            canVote={canUseName}
+            onVerdict={onVerdict}
+          />
+        </div>
       ) : null}
 
-      <div className="mt-6 border-t border-[var(--line)] pt-5">
+      <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 focus-within:opacity-100">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-extrabold">댓글 {post.comments.length}</h4>
           <span className="text-xs text-[var(--ink-soft)]">
@@ -1520,7 +1529,7 @@ function PostActions({
   const bookmarked = post.myReactions?.saved ?? false;
 
   return (
-    <div className="mt-5 flex items-stretch gap-2">
+    <div className="mt-4 flex items-stretch gap-1.5">
       <div className="grid min-w-0 flex-1 grid-cols-3 overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
         <ReactionButton
           icon={Heart}
@@ -1550,13 +1559,13 @@ function PostActions({
         title={bookmarked ? "스크랩에서 삭제" : "내 스크랩에 저장"}
         onClick={() => onReact("saved")}
         className={cn(
-          "flex w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-[8px] border text-xs font-bold transition",
+          "flex w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[8px] border text-[10px] font-bold transition",
           bookmarked
             ? "border-[var(--plum)] bg-[#f4ebe3] text-[var(--plum)]"
             : "border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--plum)]",
         )}
       >
-        <Bookmark className={cn("size-4", bookmarked ? "fill-current" : "")} />
+        <Bookmark className={cn("size-3.5", bookmarked ? "fill-current" : "")} />
         저장
       </button>
     </div>
@@ -1582,15 +1591,15 @@ function ReactionButton({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 border-r border-[var(--line)] px-1 text-[11px] font-bold transition last:border-r-0",
+        "flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 border-r border-[var(--line)] px-1 text-[10px] font-bold transition last:border-r-0",
         selected
           ? "bg-[#fff0eb] text-[var(--coral)]"
           : "text-[var(--ink-soft)] hover:bg-[#fff6f2] hover:text-[var(--foreground)]",
       )}
     >
-      <Icon className="size-3.5 shrink-0 text-[var(--coral)]" />
-      <span className="whitespace-nowrap leading-5">{label}</span>
-      <span className="text-[11px] font-normal">{value}</span>
+      <Icon className="size-3 shrink-0 text-[var(--coral)]" />
+      <span className="whitespace-nowrap leading-4">{label}</span>
+      <span className="text-[10px] font-normal">{value}</span>
     </button>
   );
 }

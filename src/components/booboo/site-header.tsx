@@ -25,6 +25,7 @@ type SiteHeaderProps = {
   query?: string;
   onQueryChange?: (value: string) => void;
   onWriteClick?: () => void;
+  muted?: boolean;
 };
 
 const navItems = [
@@ -37,6 +38,7 @@ export function SiteHeader({
   query,
   onQueryChange,
   onWriteClick,
+  muted = false,
 }: SiteHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -67,7 +69,13 @@ export function SiteHeader({
   }, [profileOpen]);
 
   return (
-    <header className="relative z-[80] border-b border-[var(--line)] bg-[rgba(255,250,246,0.9)] backdrop-blur">
+    <header
+      className={cn(
+        "relative z-[80] border-b border-[var(--line)] bg-[rgba(255,250,246,0.9)] backdrop-blur",
+        muted &&
+          "opacity-80 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100",
+      )}
+    >
       <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-4 px-4 py-3 md:px-8">
         <Link href="/" className="flex items-center gap-3">
           <Image
