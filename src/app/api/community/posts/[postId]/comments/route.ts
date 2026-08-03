@@ -10,7 +10,7 @@ export async function POST(
 ) {
   const session = await auth();
   const { postId } = await context.params;
-  const payload = await request.json();
+  const payload = await request.json().catch(() => null);
   const parsed = createCommentSchema.safeParse(payload);
 
   if (!parsed.success) {
