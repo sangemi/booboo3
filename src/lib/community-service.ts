@@ -127,7 +127,7 @@ type LetterWithReactions = AnonymousLetterModel & {
 
 export async function listCommunityPosts(userId?: string) {
   const posts = await prisma.post.findMany({
-    orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+    orderBy: { createdAt: "desc" },
     include: {
       author: { select: authorSelect },
       comments: {
