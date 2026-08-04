@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { BoobooApp } from "@/components/booboo/booboo-app";
@@ -16,10 +16,14 @@ import {
   listAnonymousLetters,
   listCommunityPosts,
 } from "@/lib/community-service";
+import {
+  legacyTalkUrl,
+  type LegacyTalkSearchParams,
+} from "@/lib/legacy-talk";
 
 type PostPageProps = {
   params: Promise<{ postId: string }>;
-  searchParams: Promise<{ category?: string | string[] }>;
+  searchParams: Promise<LegacyTalkSearchParams>;
 };
 
 export async function generateMetadata({
@@ -45,7 +49,8 @@ export async function generateMetadata({
 
 export default async function PostPage({ params, searchParams }: PostPageProps) {
   const { postId } = await params;
-  const { category } = await searchParams;
+  const resolvedSearchParams = await searchParams;
+  const { category } = resolvedSearchParams;
   const [session, cookieStore] = await Promise.all([auth(), cookies()]);
   const [post, posts, letters, mission] = await Promise.all([
     getCommunityPostByPublicId(
@@ -65,7 +70,11 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
     ),
   ]);
 
-  if (!post) notFound();
+  if (!post) {
+    permanentRedirect(
+      legacyTalkUrl(["post", postId], resolvedSearchParams),
+    );
+  }
 
   const initialPosts = posts.some((item) => item.id === post.id)
     ? posts
