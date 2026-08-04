@@ -25,7 +25,10 @@ export default async function Home({ searchParams }: HomePageProps) {
     cookies(),
   ]);
   const [posts, letters, mission] = await Promise.all([
-    listCommunityPosts(session?.user?.id).catch(() => seedPosts),
+    listCommunityPosts(
+      session?.user?.id,
+      cookieStore.get("booboo_anon_id")?.value,
+    ).catch(() => seedPosts),
     listAnonymousLetters(cookieStore.get("booboo_anon_id")?.value).catch(
       () => seedLetters,
     ),

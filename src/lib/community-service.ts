@@ -1,5 +1,6 @@
 import {
   CommentTone,
+  CommentReactionType,
   LetterReactionType,
   LetterTone,
   PostCategory,
@@ -8,6 +9,7 @@ import {
 } from "@/generated/prisma/enums";
 import type {
   CommentModel,
+  CommentReactionModel,
   AnonymousLetterModel,
   LetterReactionModel,
   PostModel,
@@ -32,6 +34,7 @@ type AuthorSummary = {
 
 type CommentWithAuthor = CommentModel & {
   author: AuthorSummary;
+  reactions: CommentReactionModel[];
 };
 
 type PostWithRelations = PostModel & {
@@ -90,6 +93,16 @@ const commentToneFromDb = {
   [CommentTone.QUESTION]: "question",
 } as const;
 
+const commentReactionToDb = {
+  up: CommentReactionType.UP,
+  down: CommentReactionType.DOWN,
+} as const;
+
+const commentReactionFromDb = {
+  [CommentReactionType.UP]: "up",
+  [CommentReactionType.DOWN]: "down",
+} as const;
+
 const reactionFromDb = {
   [ReactionType.ME_TOO]: "meToo",
   [ReactionType.HUG]: "hug",
@@ -125,14 +138,17 @@ type LetterWithReactions = AnonymousLetterModel & {
   reactions: LetterReactionModel[];
 };
 
-export async function listCommunityPosts(userId?: string) {
+export async function listCommunityPosts(userId?: string, anonKey?: string) {
   const posts = await prisma.post.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       author: { select: authorSelect },
       comments: {
         orderBy: { createdAt: "asc" },
-        include: { author: { select: authorSelect } },
+        include: {
+          author: { select: authorSelect },
+          reactions: true,
+        },
       },
       reactions: true,
       verdictVotes: true,
@@ -140,12 +156,13 @@ export async function listCommunityPosts(userId?: string) {
     take: 50,
   });
 
-  return posts.map((post) => toCommunityPost(post, userId));
+  return posts.map((post) => toCommunityPost(post, userId, anonKey));
 }
 
 export async function getCommunityPostByPublicId(
   publicId: number,
   userId?: string,
+  anonKey?: string,
 ) {
   if (!Number.isSafeInteger(publicId) || publicId < 1) return null;
 
@@ -155,14 +172,17 @@ export async function getCommunityPostByPublicId(
       author: { select: authorSelect },
       comments: {
         orderBy: { createdAt: "asc" },
-        include: { author: { select: authorSelect } },
+        include: {
+          author: { select: authorSelect },
+          reactions: true,
+        },
       },
       reactions: true,
       verdictVotes: true,
     },
   });
 
-  return post ? toCommunityPost(post, userId) : null;
+  return post ? toCommunityPost(post, userId, anonKey) : null;
 }
 
 export async function createCommunityPost(input: {
@@ -200,7 +220,12 @@ export async function createCommunityPost(input: {
     },
     include: {
       author: { select: authorSelect },
-      comments: { include: { author: { select: authorSelect } } },
+      comments: {
+        include: {
+          author: { select: authorSelect },
+          reactions: true,
+        },
+      },
       reactions: true,
       verdictVotes: true,
     },
@@ -214,8 +239,30 @@ export async function createCommunityComment(input: {
   body: string;
   tone: keyof typeof commentToneToDb;
   userId?: string;
+  anonKey?: string;
   isAnonymous: boolean;
 }) {
+  const cooldownStartedAt = new Date(Date.now() - 10_000);
+  const recentComment = await prisma.comment.findFirst({
+    where: input.userId
+      ? { authorId: input.userId, createdAt: { gt: cooldownStartedAt } }
+      : {
+          authorId: null,
+          anonKey: input.anonKey,
+          createdAt: { gt: cooldownStartedAt },
+        },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+
+  if (recentComment) {
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((recentComment.createdAt.getTime() + 10_000 - Date.now()) / 1000),
+    );
+    throw new CommentCooldownError(retryAfterSeconds);
+  }
+
   const isAnonymous = !input.userId || input.isAnonymous;
   const author = input.userId
     ? await prisma.user.findUnique({
@@ -229,26 +276,104 @@ export async function createCommunityComment(input: {
       body: input.body,
       tone: commentToneToDb[input.tone],
       authorId: input.userId,
+      anonKey: input.userId ? null : input.anonKey,
       authorName: isAnonymous
-        ? "방문자"
+        ? "익명"
         : author?.nickname ?? author?.name ?? "부부라이프 회원",
       isAnonymous,
     },
-    include: { author: { select: authorSelect } },
+    include: {
+      author: { select: authorSelect },
+      reactions: true,
+    },
   });
 
-  return {
-    id: comment.id,
-    author: comment.isAnonymous
-      ? comment.authorName
-      : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
-    authorVerifiedPersonaCount: comment.isAnonymous
-      ? 0
-      : comment.author?._count.personas ?? 0,
-    body: comment.body,
-    tone: commentToneFromDb[comment.tone],
-    createdAt: relativeTime(comment.createdAt),
-  };
+  return toCommunityComment(comment, input.userId, input.anonKey);
+}
+
+export class CommentCooldownError extends Error {
+  constructor(readonly retryAfterSeconds: number) {
+    super("COMMENT_COOLDOWN");
+  }
+}
+
+export class CommentNotFoundError extends Error {}
+export class CommentPermissionError extends Error {}
+
+export async function updateCommunityComment(input: {
+  commentId: string;
+  body: string;
+  userId?: string;
+  anonKey?: string;
+}) {
+  const existing = await findCommentForManagement(input.commentId);
+  assertCommentOwner(existing, input.userId, input.anonKey);
+
+  const comment = await prisma.comment.update({
+    where: { id: input.commentId },
+    data: { body: input.body },
+    include: {
+      author: { select: authorSelect },
+      reactions: true,
+    },
+  });
+
+  return toCommunityComment(comment, input.userId, input.anonKey);
+}
+
+export async function deleteCommunityComment(input: {
+  commentId: string;
+  userId?: string;
+  anonKey?: string;
+}) {
+  const existing = await findCommentForManagement(input.commentId);
+  assertCommentOwner(existing, input.userId, input.anonKey);
+  await prisma.comment.delete({ where: { id: input.commentId } });
+}
+
+export async function reactToCommunityComment(input: {
+  commentId: string;
+  type: keyof typeof commentReactionToDb;
+  userId?: string;
+  anonKey?: string;
+}) {
+  const actorKey = commentActorKey(input.userId, input.anonKey);
+  if (!actorKey) throw new CommentPermissionError();
+
+  const comment = await findCommentForManagement(input.commentId);
+  if (isCommentOwner(comment, input.userId, input.anonKey)) {
+    throw new CommentPermissionError();
+  }
+
+  const type = commentReactionToDb[input.type];
+  const existing = await prisma.commentReaction.findUnique({
+    where: {
+      commentId_actorKey: {
+        commentId: input.commentId,
+        actorKey,
+      },
+    },
+  });
+
+  if (existing?.type === type) {
+    await prisma.commentReaction.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.commentReaction.upsert({
+      where: {
+        commentId_actorKey: {
+          commentId: input.commentId,
+          actorKey,
+        },
+      },
+      create: { commentId: input.commentId, actorKey, type },
+      update: { type },
+    });
+  }
+
+  const reactions = await prisma.commentReaction.findMany({
+    where: { commentId: input.commentId },
+  });
+  return summarizeCommentReactions(reactions, actorKey);
 }
 
 export async function createCommunityReaction(input: {
@@ -587,6 +712,7 @@ export async function createTemperatureCheck(input: {
 function toCommunityPost(
   post: PostWithRelations,
   currentUserId?: string,
+  currentAnonKey?: string,
 ): CommunityPost {
   const ownVerdict = currentUserId
     ? post.verdictVotes.find((vote) => vote.userId === currentUserId)
@@ -609,18 +735,9 @@ function toCommunityPost(
     temperature: post.temperature ?? 70,
     createdAt: relativeTime(post.createdAt),
     readMinutes: post.readMinutes,
-    comments: post.comments.map((comment) => ({
-      id: comment.id,
-      author: comment.isAnonymous
-        ? comment.authorName
-        : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
-      authorVerifiedPersonaCount: comment.isAnonymous
-        ? 0
-        : comment.author?._count.personas ?? 0,
-      body: comment.body,
-      tone: commentToneFromDb[comment.tone],
-      createdAt: relativeTime(comment.createdAt),
-    })),
+    comments: post.comments.map((comment) =>
+      toCommunityComment(comment, currentUserId, currentAnonKey),
+    ),
     ...summarizePostReactions(post.reactions, currentUserId),
     verdicts: post.verdictVotes.reduce<VerdictState>(
       (state, vote) => {
@@ -632,6 +749,84 @@ function toCommunityPost(
     myVerdict: ownVerdict ? verdictFromDb[ownVerdict.choice] : null,
     tags: post.tags,
     pinned: post.isPinned,
+  };
+}
+
+async function findCommentForManagement(commentId: string) {
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    include: {
+      author: { select: authorSelect },
+      reactions: true,
+    },
+  });
+  if (!comment) throw new CommentNotFoundError();
+  return comment;
+}
+
+function assertCommentOwner(
+  comment: CommentWithAuthor,
+  userId?: string,
+  anonKey?: string,
+) {
+  if (!isCommentOwner(comment, userId, anonKey)) {
+    throw new CommentPermissionError();
+  }
+}
+
+function isCommentOwner(
+  comment: CommentModel,
+  userId?: string,
+  anonKey?: string,
+) {
+  if (userId) return comment.authorId === userId;
+  return Boolean(anonKey && !comment.authorId && comment.anonKey === anonKey);
+}
+
+function commentActorKey(userId?: string, anonKey?: string) {
+  if (userId) return `user:${userId}`;
+  return anonKey ? `anon:${anonKey}` : undefined;
+}
+
+function toCommunityComment(
+  comment: CommentWithAuthor,
+  currentUserId?: string,
+  currentAnonKey?: string,
+) {
+  const actorKey = commentActorKey(currentUserId, currentAnonKey);
+
+  return {
+    id: comment.id,
+    author: comment.isAnonymous
+      ? "익명"
+      : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
+    authorVerifiedPersonaCount: comment.isAnonymous
+      ? 0
+      : comment.author?._count.personas ?? 0,
+    body: comment.body,
+    tone: commentToneFromDb[comment.tone],
+    createdAt: relativeTime(comment.createdAt),
+    canManage: isCommentOwner(comment, currentUserId, currentAnonKey),
+    ...summarizeCommentReactions(comment.reactions, actorKey),
+  };
+}
+
+function summarizeCommentReactions(
+  reactions: CommentReactionModel[],
+  actorKey?: string,
+) {
+  const ownReaction = actorKey
+    ? reactions.find((reaction) => reaction.actorKey === actorKey)
+    : undefined;
+
+  return {
+    upvotes: reactions.filter(
+      (reaction) => reaction.type === CommentReactionType.UP,
+    ).length,
+    downvotes: reactions.filter(
+      (reaction) => reaction.type === CommentReactionType.DOWN,
+    ).length,
+    myReaction: ownReaction ? commentReactionFromDb[ownReaction.type] : null,
   };
 }
 

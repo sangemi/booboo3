@@ -15,6 +15,14 @@ export const createCommentSchema = z.object({
   isAnonymous: z.boolean().default(true),
 });
 
+export const updateCommentSchema = z.object({
+  body: z.string().trim().min(2).max(1200),
+});
+
+export const createCommentReactionSchema = z.object({
+  type: z.enum(["up", "down"]),
+});
+
 export const createReactionSchema = z.object({
   type: z.enum(["meToo", "hug", "helpful"]),
 });

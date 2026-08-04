@@ -2,17 +2,20 @@
 
 import {
   Bookmark,
+  Check,
   ChevronLeft,
   ChevronRight,
   Flame,
   Heart,
   Lock,
   MessageCircle,
+  Pencil,
   Send,
   Smile,
   Sparkles,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,6 +28,7 @@ import {
   categories,
   categoryLabels,
   CategoryKey,
+  CommentItem,
   CommunityPost,
   dailyMissionSelection,
   emptyVerdicts,
@@ -103,6 +107,7 @@ export function BoobooApp({
   const [commentSubmitErrors, setCommentSubmitErrors] = useState<
     Record<string, string>
   >({});
+  const [commentCooldownSeconds, setCommentCooldownSeconds] = useState(0);
   const [postAsMe, setPostAsMe] = useState(false);
   const [commentAsMe, setCommentAsMe] = useState(false);
   const [letterDraft, setLetterDraft] = useState("");
@@ -203,6 +208,7 @@ export function BoobooApp({
   const selectedLetter = communityLetters.find(
     (letter) => letter.id === selectedLetterId,
   );
+  const commentCoolingDown = commentCooldownSeconds > 0;
   const selectedPostIndex = selectedPost
     ? filteredPosts.findIndex((post) => post.id === selectedPost.id)
     : -1;
@@ -222,6 +228,16 @@ export function BoobooApp({
       document.body.style.overflow = originalOverflow;
     };
   }, [mobileDetailOpen]);
+
+  useEffect(() => {
+    if (commentCooldownSeconds <= 0) return;
+
+    const timeout = window.setTimeout(
+      () => setCommentCooldownSeconds((current) => Math.max(0, current - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [commentCooldownSeconds]);
 
   useEffect(() => {
     if (!selectedLetterId) return;
@@ -420,7 +436,7 @@ export function BoobooApp({
   async function submitComment(postId: string, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const draft = commentDrafts[postId]?.trim();
-    if (!draft) return;
+    if (!draft || commentCoolingDown) return;
     setCommentSubmitErrors((current) => ({ ...current, [postId]: "" }));
 
     try {
@@ -434,21 +450,33 @@ export function BoobooApp({
         }),
       });
 
-      if (response.ok) {
-        const payload = (await response.json()) as {
-          comment?: CommunityPost["comments"][number];
-        };
-        if (payload.comment) {
-          setPosts((current) =>
-            current.map((post) =>
-              post.id === postId
-                ? { ...post, comments: [...post.comments, payload.comment!] }
-                : post,
-            ),
-          );
-          setCommentDrafts((current) => ({ ...current, [postId]: "" }));
-          return;
-        }
+      const payload = (await response.json()) as {
+        comment?: CommentItem;
+        error?: string;
+        retryAfterSeconds?: number;
+      };
+
+      if (response.status === 429) {
+        const retryAfterSeconds = payload.retryAfterSeconds ?? 10;
+        setCommentCooldownSeconds(retryAfterSeconds);
+        setCommentSubmitErrors((current) => ({
+          ...current,
+          [postId]: `댓글은 10초에 한 번 작성할 수 있습니다. ${retryAfterSeconds}초 후 다시 시도해 주세요.`,
+        }));
+        return;
+      }
+
+      if (response.ok && payload.comment) {
+        setPosts((current) =>
+          current.map((post) =>
+            post.id === postId
+              ? { ...post, comments: [...post.comments, payload.comment!] }
+              : post,
+          ),
+        );
+        setCommentDrafts((current) => ({ ...current, [postId]: "" }));
+        setCommentCooldownSeconds(10);
+        return;
       }
     } catch {
       // The error below keeps unsaved comments from looking published.
@@ -458,6 +486,104 @@ export function BoobooApp({
       [postId]:
         "댓글을 저장하지 못했습니다. 작성한 내용은 그대로 두었으니 다시 시도해 주세요.",
     }));
+  }
+
+  async function updateComment(
+    postId: string,
+    commentId: string,
+    body: string,
+  ) {
+    try {
+      const response = await fetch(`/api/community/comments/${commentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      if (!response.ok) return false;
+
+      const payload = (await response.json()) as { comment?: CommentItem };
+      if (!payload.comment) return false;
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                comments: post.comments.map((comment) =>
+                  comment.id === commentId ? payload.comment! : comment,
+                ),
+              }
+            : post,
+        ),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function deleteComment(postId: string, commentId: string) {
+    try {
+      const response = await fetch(`/api/community/comments/${commentId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) return false;
+
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                comments: post.comments.filter(
+                  (comment) => comment.id !== commentId,
+                ),
+              }
+            : post,
+        ),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function reactToComment(
+    postId: string,
+    commentId: string,
+    type: "up" | "down",
+  ) {
+    try {
+      const response = await fetch(
+        `/api/community/comments/${commentId}/reactions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type }),
+        },
+      );
+      if (!response.ok) return false;
+
+      const payload = (await response.json()) as {
+        reaction?: Pick<CommentItem, "upvotes" | "downvotes" | "myReaction">;
+      };
+      if (!payload.reaction) return false;
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                comments: post.comments.map((comment) =>
+                  comment.id === commentId
+                    ? { ...comment, ...payload.reaction }
+                    : comment,
+                ),
+              }
+            : post,
+        ),
+      );
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async function participateInMission() {
@@ -848,37 +974,25 @@ export function BoobooApp({
                 ) : null}
 
                 <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-extrabold">
-                      댓글 {selectedPost.comments.length}
-                    </h4>
-                    <span className="text-xs text-[var(--ink-soft)]">
-                      따뜻한 댓글 바래요
-                    </span>
-                  </div>
+                  <h4 className="text-sm font-extrabold">
+                    댓글 {selectedPost.comments.length}
+                  </h4>
                   <div className="mt-3 space-y-3">
                     {selectedPost.comments.length > 0 ? (
                       selectedPost.comments.map((comment) => (
-                        <div
+                        <CommentCard
                           key={comment.id}
-                          className="rounded-[8px] bg-[#fbf6f0] p-3"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <VerifiedName
-                              name={comment.author}
-                              verifiedCount={
-                                comment.authorVerifiedPersonaCount ?? 0
-                              }
-                              compact
-                            />
-                            <span className="text-xs text-[var(--ink-soft)]">
-                              {comment.createdAt}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
-                            {comment.body}
-                          </p>
-                        </div>
+                          comment={comment}
+                          onUpdate={(body) =>
+                            updateComment(selectedPost.id, comment.id, body)
+                          }
+                          onDelete={() =>
+                            deleteComment(selectedPost.id, comment.id)
+                          }
+                          onReact={(type) =>
+                            reactToComment(selectedPost.id, comment.id, type)
+                          }
+                        />
                       ))
                     ) : (
                       <p className="rounded-[8px] bg-[#fbf6f0] px-3 py-5 text-center text-sm text-[var(--ink-soft)]">
@@ -906,11 +1020,12 @@ export function BoobooApp({
                           }))
                         }
                         className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
-                        placeholder="따뜻한 댓글 남기기"
+                        placeholder="댓글을 적어주세요."
                       />
                       <button
                         aria-label="댓글 등록"
-                        className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white"
+                        disabled={commentCoolingDown}
+                        className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Send className="size-4" />
                       </button>
@@ -918,6 +1033,12 @@ export function BoobooApp({
                     {commentSubmitErrors[selectedPost.id] ? (
                       <p role="alert" className="mt-2 text-xs text-[var(--coral)]">
                         {commentSubmitErrors[selectedPost.id]}
+                      </p>
+                    ) : null}
+                    {commentCoolingDown &&
+                    !commentSubmitErrors[selectedPost.id] ? (
+                      <p className="mt-2 text-xs text-[var(--ink-soft)]">
+                        댓글은 10초에 한 번 작성할 수 있습니다.
                       </p>
                     ) : null}
                   </form>
@@ -1148,6 +1269,7 @@ export function BoobooApp({
               post={selectedPost}
               commentDraft={commentDrafts[selectedPost.id] ?? ""}
               commentError={commentSubmitErrors[selectedPost.id] ?? ""}
+              commentCoolingDown={commentCoolingDown}
               onCommentDraftChange={(value) =>
                 setCommentDrafts((current) => ({
                   ...current,
@@ -1158,6 +1280,15 @@ export function BoobooApp({
               commentAsMe={commentAsMe}
               onCommentIdentityChange={setCommentAsMe}
               onSubmitComment={(event) => submitComment(selectedPost.id, event)}
+              onUpdateComment={(commentId, body) =>
+                updateComment(selectedPost.id, commentId, body)
+              }
+              onDeleteComment={(commentId) =>
+                deleteComment(selectedPost.id, commentId)
+              }
+              onReactToComment={(commentId, type) =>
+                reactToComment(selectedPost.id, commentId, type)
+              }
               onReact={(type) => reactToPost(selectedPost.id, type)}
               onVerdict={(choice) => voteVerdict(selectedPost.id, choice)}
             />
@@ -1345,26 +1476,246 @@ function visibleCategoryForPost(
   return "talk";
 }
 
+function CommentCard({
+  comment,
+  onUpdate,
+  onDelete,
+  onReact,
+}: {
+  comment: CommentItem;
+  onUpdate: (body: string) => Promise<boolean>;
+  onDelete: () => Promise<boolean>;
+  onReact: (type: "up" | "down") => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [draft, setDraft] = useState(comment.body);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function saveEdit() {
+    const body = draft.trim();
+    if (body.length < 2 || pending) return;
+    setPending(true);
+    setError("");
+    const updated = await onUpdate(body);
+    setPending(false);
+    if (updated) {
+      setEditing(false);
+    } else {
+      setError("댓글을 수정하지 못했습니다. 다시 시도해 주세요.");
+    }
+  }
+
+  async function removeComment() {
+    if (pending) return;
+    setPending(true);
+    setError("");
+    const deleted = await onDelete();
+    setPending(false);
+    if (!deleted) {
+      setError("댓글을 삭제하지 못했습니다. 다시 시도해 주세요.");
+      setDeleteConfirmOpen(false);
+    }
+  }
+
+  async function react(type: "up" | "down") {
+    if (pending) return;
+    setPending(true);
+    setError("");
+    const reacted = await onReact(type);
+    setPending(false);
+    if (!reacted) {
+      setError("반응을 저장하지 못했습니다. 다시 시도해 주세요.");
+    }
+  }
+
+  return (
+    <div className="rounded-[8px] bg-[#fbf6f0] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <VerifiedName
+          name={comment.author}
+          verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
+          compact
+        />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="text-xs text-[var(--ink-soft)]">
+            {comment.createdAt}
+          </span>
+          {comment.canManage ? (
+            <>
+              <button
+                type="button"
+                title="댓글 수정"
+                aria-label="댓글 수정"
+                onClick={() => {
+                  setEditing(true);
+                  setDeleteConfirmOpen(false);
+                  setError("");
+                }}
+                className="grid size-7 place-items-center rounded-[6px] text-[var(--ink-soft)] hover:bg-white hover:text-[var(--foreground)]"
+              >
+                <Pencil className="size-3.5" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                title="댓글 삭제"
+                aria-label="댓글 삭제"
+                onClick={() => {
+                  setDeleteConfirmOpen(true);
+                  setEditing(false);
+                  setError("");
+                }}
+                className="grid size-7 place-items-center rounded-[6px] text-[var(--ink-soft)] hover:bg-white hover:text-[var(--coral)]"
+              >
+                <Trash2 className="size-3.5" aria-hidden="true" />
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="mt-3">
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            maxLength={1200}
+            rows={3}
+            className="w-full resize-y rounded-[8px] border border-[var(--line)] bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[var(--plum)]"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(comment.body);
+                setEditing(false);
+                setError("");
+              }}
+              className="inline-flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] bg-white px-3 text-xs font-bold"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+              취소
+            </button>
+            <button
+              type="button"
+              disabled={draft.trim().length < 2 || pending}
+              onClick={saveEdit}
+              className="inline-flex h-8 items-center gap-1 rounded-[6px] bg-[var(--plum)] px-3 text-xs font-bold text-white disabled:opacity-40"
+            >
+              <Check className="size-3.5" aria-hidden="true" />
+              저장
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--ink-soft)]">
+          {comment.body}
+        </p>
+      )}
+
+      {deleteConfirmOpen ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[6px] border border-[#ecd4cf] bg-white px-3 py-2">
+          <span className="text-xs font-bold">이 댓글을 삭제할까요?</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setDeleteConfirmOpen(false)}
+              className="h-7 rounded-[6px] border border-[var(--line)] px-2.5 text-xs font-bold"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={removeComment}
+              className="h-7 rounded-[6px] bg-[var(--coral)] px-2.5 text-xs font-bold text-white disabled:opacity-40"
+            >
+              삭제
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!comment.canManage ? (
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            title="댓글 좋아요"
+            aria-label="댓글 좋아요"
+            aria-pressed={comment.myReaction === "up"}
+            disabled={pending}
+            onClick={() => react("up")}
+            className={cn(
+              "inline-flex h-8 items-center gap-1 rounded-[6px] border px-2.5 text-xs font-bold transition disabled:opacity-40",
+              comment.myReaction === "up"
+                ? "border-[#9db5a4] bg-[#edf4ef] text-[#46634f]"
+                : "border-[var(--line)] bg-white text-[var(--ink-soft)]",
+            )}
+          >
+            <ThumbsUp className="size-3.5" aria-hidden="true" />
+            {comment.upvotes ?? 0}
+          </button>
+          <button
+            type="button"
+            title="댓글 싫어요"
+            aria-label="댓글 싫어요"
+            aria-pressed={comment.myReaction === "down"}
+            disabled={pending}
+            onClick={() => react("down")}
+            className={cn(
+              "inline-flex h-8 items-center gap-1 rounded-[6px] border px-2.5 text-xs font-bold transition disabled:opacity-40",
+              comment.myReaction === "down"
+                ? "border-[#e5b0a8] bg-[#fff0ed] text-[#8a453d]"
+                : "border-[var(--line)] bg-white text-[var(--ink-soft)]",
+            )}
+          >
+            <ThumbsDown className="size-3.5" aria-hidden="true" />
+            {comment.downvotes ?? 0}
+          </button>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="mt-2 text-xs text-[var(--coral)]">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function MobilePostDetail({
   post,
   commentDraft,
   commentError,
+  commentCoolingDown,
   onCommentDraftChange,
   canUseName,
   commentAsMe,
   onCommentIdentityChange,
   onSubmitComment,
+  onUpdateComment,
+  onDeleteComment,
+  onReactToComment,
   onReact,
   onVerdict,
 }: {
   post: CommunityPost;
   commentDraft: string;
   commentError: string;
+  commentCoolingDown: boolean;
   onCommentDraftChange: (value: string) => void;
   canUseName: boolean;
   commentAsMe: boolean;
   onCommentIdentityChange: (value: boolean) => void;
   onSubmitComment: (event: FormEvent<HTMLFormElement>) => void;
+  onUpdateComment: (commentId: string, body: string) => Promise<boolean>;
+  onDeleteComment: (commentId: string) => Promise<boolean>;
+  onReactToComment: (
+    commentId: string,
+    type: "up" | "down",
+  ) => Promise<boolean>;
   onReact: (type: keyof CommunityPost["reactions"]) => void;
   onVerdict: (choice: keyof VerdictState) => void;
 }) {
@@ -1416,30 +1767,17 @@ function MobilePostDetail({
       ) : null}
 
       <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 focus-within:opacity-100">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-extrabold">댓글 {post.comments.length}</h4>
-          <span className="text-xs text-[var(--ink-soft)]">
-            따뜻한 댓글 바래요
-          </span>
-        </div>
+        <h4 className="text-sm font-extrabold">댓글 {post.comments.length}</h4>
         <div className="mt-3 space-y-3">
           {post.comments.length > 0 ? (
             post.comments.map((comment) => (
-              <div key={comment.id} className="rounded-[8px] bg-[#fbf6f0] p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <VerifiedName
-                    name={comment.author}
-                    verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
-                    compact
-                  />
-                  <span className="text-xs text-[var(--ink-soft)]">
-                    {comment.createdAt}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
-                  {comment.body}
-                </p>
-              </div>
+              <CommentCard
+                key={comment.id}
+                comment={comment}
+                onUpdate={(body) => onUpdateComment(comment.id, body)}
+                onDelete={() => onDeleteComment(comment.id)}
+                onReact={(type) => onReactToComment(comment.id, type)}
+              />
             ))
           ) : (
             <p className="rounded-[8px] bg-[#fbf6f0] px-3 py-5 text-center text-sm text-[var(--ink-soft)]">
@@ -1459,11 +1797,12 @@ function MobilePostDetail({
               value={commentDraft}
               onChange={(event) => onCommentDraftChange(event.target.value)}
               className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
-              placeholder="따뜻한 댓글 남기기"
+              placeholder="댓글을 적어주세요."
             />
             <button
               aria-label="댓글 등록"
-              className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white"
+              disabled={commentCoolingDown}
+              className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send className="size-4" />
             </button>
@@ -1471,6 +1810,11 @@ function MobilePostDetail({
           {commentError ? (
             <p role="alert" className="mt-2 text-xs text-[var(--coral)]">
               {commentError}
+            </p>
+          ) : null}
+          {commentCoolingDown && !commentError ? (
+            <p className="mt-2 text-xs text-[var(--ink-soft)]">
+              댓글은 10초에 한 번 작성할 수 있습니다.
             </p>
           ) : null}
         </form>

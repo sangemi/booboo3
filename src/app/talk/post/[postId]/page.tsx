@@ -48,8 +48,15 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
   const { category } = await searchParams;
   const [session, cookieStore] = await Promise.all([auth(), cookies()]);
   const [post, posts, letters, mission] = await Promise.all([
-    getCommunityPostByPublicId(Number(postId), session?.user?.id),
-    listCommunityPosts(session?.user?.id).catch(() => seedPosts),
+    getCommunityPostByPublicId(
+      Number(postId),
+      session?.user?.id,
+      cookieStore.get("booboo_anon_id")?.value,
+    ),
+    listCommunityPosts(
+      session?.user?.id,
+      cookieStore.get("booboo_anon_id")?.value,
+    ).catch(() => seedPosts),
     listAnonymousLetters(cookieStore.get("booboo_anon_id")?.value).catch(
       () => seedLetters,
     ),

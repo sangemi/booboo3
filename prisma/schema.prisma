@@ -30,6 +30,11 @@ enum CommentTone {
   QUESTION
 }
 
+enum CommentReactionType {
+  UP
+  DOWN
+}
+
 enum LetterTone {
   THANKS
   SORRY
@@ -258,6 +263,7 @@ model Comment {
   id              String      @id @default(cuid())
   postId          String
   authorId        String?
+  anonKey         String?
   authorName      String      @default("방문자")
   isAnonymous     Boolean     @default(true)
   body            String
@@ -273,11 +279,27 @@ model Comment {
   legacyCreatedAt DateTime?
   post            Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
   author          User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  reactions       CommentReaction[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@index([postId, createdAt])
+  @@index([authorId, createdAt])
+  @@index([anonKey, createdAt])
   @@index([legacyId])
+}
+
+model CommentReaction {
+  id        String              @id @default(cuid())
+  commentId String
+  actorKey  String
+  type      CommentReactionType
+  comment   Comment             @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([commentId, actorKey])
+  @@index([commentId, type])
 }
 
 model Reaction {

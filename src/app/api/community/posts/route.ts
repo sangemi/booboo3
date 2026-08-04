@@ -1,14 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { seedPosts } from "@/lib/community-data";
 import { createPostSchema } from "@/lib/community-schema";
 import { createCommunityPost, listCommunityPosts } from "@/lib/community-service";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
-    const posts = await listCommunityPosts(session?.user?.id);
+    const posts = await listCommunityPosts(
+      session?.user?.id,
+      request.cookies.get("booboo_anon_id")?.value,
+    );
     return NextResponse.json({
       posts,
       source: "database",

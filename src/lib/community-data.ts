@@ -39,6 +39,10 @@ export type CommentItem = {
   body: string;
   tone: "support" | "advice" | "question";
   createdAt: string;
+  canManage?: boolean;
+  upvotes?: number;
+  downvotes?: number;
+  myReaction?: "up" | "down" | null;
 };
 
 export type ReactionState = {
