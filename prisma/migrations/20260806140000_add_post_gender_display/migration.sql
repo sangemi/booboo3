@@ -1,0 +1,3 @@
+ALTER TABLE "Post"
+ADD COLUMN "showAuthorGender" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "showCommenterGender" BOOLEAN NOT NULL DEFAULT true;

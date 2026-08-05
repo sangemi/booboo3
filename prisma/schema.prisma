@@ -225,6 +225,8 @@ model Post {
   readMinutes        Int           @default(1)
   isPinned           Boolean       @default(false)
   isAnonymous        Boolean       @default(false)
+  showAuthorGender   Boolean       @default(false)
+  showCommenterGender Boolean       @default(true)
   tags               String[]      @default([])
   /// Legacy compatibility for booboo2 URLs and migrated posts.
   /// TODO(legacy): Remove after 2027-06 if old /talk/post/:id traffic is no longer needed.

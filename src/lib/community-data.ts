@@ -9,6 +9,7 @@ export type CategoryKey =
   | "letters";
 
 export type MoodKey = "warm" | "tired" | "need-talk" | "thankful";
+export type GenderLabel = "남성" | "여성";
 
 export type CommunityPost = {
   id: string;
@@ -17,6 +18,7 @@ export type CommunityPost = {
   title: string;
   body: string;
   author: string;
+  authorGender?: GenderLabel;
   authorVerifiedPersonaCount?: number;
   coupleStage: string;
   mood: MoodKey;
@@ -30,11 +32,14 @@ export type CommunityPost = {
   myVerdict?: keyof VerdictState | null;
   tags: string[];
   pinned?: boolean;
+  showAuthorGender?: boolean;
+  showCommenterGender?: boolean;
 };
 
 export type CommentItem = {
   id: string;
   author: string;
+  authorGender?: GenderLabel;
   authorVerifiedPersonaCount?: number;
   body: string;
   tone: "support" | "advice" | "question";

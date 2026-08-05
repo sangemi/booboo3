@@ -102,6 +102,8 @@ export function BoobooApp({
     title: "",
     body: "",
     category: "talk" as Exclude<CategoryKey, "all">,
+    showAuthorGender: false,
+    showCommenterGender: true,
   });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [commentSubmitErrors, setCommentSubmitErrors] = useState<
@@ -369,6 +371,8 @@ export function BoobooApp({
           body: newPost.body,
           tags: ["새글"],
           isAnonymous: !postAsMe,
+          showAuthorGender: newPost.showAuthorGender,
+          showCommenterGender: newPost.showCommenterGender,
         }),
       });
 
@@ -391,7 +395,13 @@ export function BoobooApp({
       return;
     }
 
-    setNewPost({ title: "", body: "", category: "talk" });
+    setNewPost({
+      title: "",
+      body: "",
+      category: "talk",
+      showAuthorGender: false,
+      showCommenterGender: true,
+    });
     setPostAsMe(false);
     setComposerOpen(false);
   }
@@ -800,41 +810,77 @@ export function BoobooApp({
                 placeholder="상황, 마음, 원하는 피드백을 적어주세요."
               />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                {session?.user ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-[var(--ink-soft)]">
-                      글쓴이
-                    </span>
-                    <div className="flex rounded-[8px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setPostAsMe(false)}
-                        className={cn(
-                          "h-8 rounded-[6px] px-3 text-xs",
-                          !postAsMe
-                            ? "bg-white font-bold text-[var(--plum)] shadow-sm"
-                            : "text-[var(--ink-soft)]",
-                        )}
-                      >
-                        익명
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPostAsMe(true)}
-                        className={cn(
-                          "h-8 rounded-[6px] px-3 text-xs",
-                          postAsMe
-                            ? "bg-white font-bold text-[var(--plum)] shadow-sm"
-                            : "text-[var(--ink-soft)]",
-                        )}
-                      >
-                        내 이름
-                      </button>
+                <div className="flex flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+                  {session?.user ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--ink-soft)]">
+                        글쓴이
+                      </span>
+                      <div className="flex rounded-[8px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setPostAsMe(false)}
+                          className={cn(
+                            "h-8 rounded-[6px] px-3 text-xs",
+                            !postAsMe
+                              ? "bg-white font-bold text-[var(--plum)] shadow-sm"
+                              : "text-[var(--ink-soft)]",
+                          )}
+                        >
+                          익명
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPostAsMe(true)}
+                          className={cn(
+                            "h-8 rounded-[6px] px-3 text-xs",
+                            postAsMe
+                              ? "bg-white font-bold text-[var(--plum)] shadow-sm"
+                              : "text-[var(--ink-soft)]",
+                          )}
+                        >
+                          내 이름
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <p className="text-xs text-[var(--ink-soft)]">
+                      익명으로 올라갑니다.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--ink-soft)] opacity-70">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={newPost.showCommenterGender}
+                        onChange={(event) =>
+                          setNewPost((current) => ({
+                            ...current,
+                            showCommenterGender: event.target.checked,
+                          }))
+                        }
+                        className="size-3.5 accent-[var(--plum)]"
+                      />
+                      댓글에 성별 표시
+                    </label>
+                    {session?.user ? (
+                      <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={newPost.showAuthorGender}
+                          onChange={(event) =>
+                            setNewPost((current) => ({
+                              ...current,
+                              showAuthorGender: event.target.checked,
+                            }))
+                          }
+                          className="size-3.5 accent-[var(--plum)]"
+                        />
+                        글쓴이 성별 표시
+                      </label>
+                    ) : null}
                   </div>
-                ) : (
-                  <p className="text-xs text-[var(--ink-soft)]">익명으로 올라갑니다.</p>
-                )}
+                </div>
                 <button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white">
                   <Send className="size-4" />
                   올리기
@@ -937,6 +983,7 @@ export function BoobooApp({
                     verifiedCount={selectedPost.authorVerifiedPersonaCount ?? 0}
                     compact
                   />
+                  <GenderBadge gender={selectedPost.authorGender} />
                   <span className="text-xs text-[var(--ink-soft)]">
                     · {selectedPost.createdAt}
                   </span>
@@ -974,9 +1021,16 @@ export function BoobooApp({
                 ) : null}
 
                 <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100">
-                  <h4 className="text-sm font-extrabold">
-                    댓글 {selectedPost.comments.length}
-                  </h4>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="text-sm font-extrabold">
+                      댓글 {selectedPost.comments.length}
+                    </h4>
+                    {selectedPost.showCommenterGender ? (
+                      <span className="text-[10px] font-bold text-[var(--ink-soft)]">
+                        댓글에 성별 표시
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="mt-3 space-y-3">
                     {selectedPost.comments.length > 0 ? (
                       selectedPost.comments.map((comment) => (
@@ -1533,11 +1587,14 @@ function CommentCard({
   return (
     <div className="rounded-[8px] bg-[#fbf6f0] p-3">
       <div className="flex items-start justify-between gap-3">
-        <VerifiedName
-          name={comment.author}
-          verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
-          compact
-        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <VerifiedName
+            name={comment.author}
+            verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
+            compact
+          />
+          <GenderBadge gender={comment.authorGender} />
+        </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <span className="text-xs text-[var(--ink-soft)]">
             {comment.createdAt}
@@ -1735,6 +1792,7 @@ function MobilePostDetail({
           verifiedCount={post.authorVerifiedPersonaCount ?? 0}
           compact
         />
+        <GenderBadge gender={post.authorGender} />
         <span className="text-xs text-[var(--ink-soft)]">· {post.createdAt}</span>
       </div>
       <p className="mt-6 whitespace-pre-line text-base leading-8 text-[#312d2a]">
@@ -1767,7 +1825,14 @@ function MobilePostDetail({
       ) : null}
 
       <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 focus-within:opacity-100">
-        <h4 className="text-sm font-extrabold">댓글 {post.comments.length}</h4>
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="text-sm font-extrabold">댓글 {post.comments.length}</h4>
+          {post.showCommenterGender ? (
+            <span className="text-[10px] font-bold text-[var(--ink-soft)]">
+              댓글에 성별 표시
+            </span>
+          ) : null}
+        </div>
         <div className="mt-3 space-y-3">
           {post.comments.length > 0 ? (
             post.comments.map((comment) => (
@@ -1860,6 +1925,16 @@ function CommentIdentityControl({
         </button>
       </div>
     </div>
+  );
+}
+
+function GenderBadge({ gender }: { gender?: CommentItem["authorGender"] }) {
+  if (!gender) return null;
+
+  return (
+    <span className="rounded-[4px] border border-[#ded4cc] bg-white px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#756c66]">
+      {gender}
+    </span>
   );
 }
 

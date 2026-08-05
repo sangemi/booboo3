@@ -7,6 +7,8 @@ export const createPostSchema = z.object({
   temperature: z.number().int().min(1).max(100).optional(),
   tags: z.array(z.string().trim().min(1).max(20)).max(6).default([]),
   isAnonymous: z.boolean().default(true),
+  showAuthorGender: z.boolean().default(false),
+  showCommenterGender: z.boolean().default(true),
 });
 
 export const createCommentSchema = z.object({

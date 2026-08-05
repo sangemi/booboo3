@@ -3,6 +3,7 @@ import {
   CommentReactionType,
   LetterReactionType,
   LetterTone,
+  PersonaType,
   PostCategory,
   ReactionType,
   VerdictChoice,
@@ -18,6 +19,7 @@ import type {
 } from "@/generated/prisma/models";
 import type {
   CommunityPost,
+  GenderLabel,
   Letter,
   ReactionSelection,
   ReactionState,
@@ -29,6 +31,7 @@ import { prisma } from "@/lib/db";
 type AuthorSummary = {
   name: string | null;
   nickname: string | null;
+  personas: Array<{ value: string; isPublic: boolean }>;
   _count: { personas: number };
 } | null;
 
@@ -47,6 +50,10 @@ type PostWithRelations = PostModel & {
 const authorSelect = {
   name: true,
   nickname: true,
+  personas: {
+    where: { type: PersonaType.GENDER },
+    select: { value: true, isPublic: true },
+  },
   _count: {
     select: {
       personas: { where: { status: "VERIFIED" as const } },
@@ -193,6 +200,8 @@ export async function createCommunityPost(input: {
   tags: string[];
   userId?: string;
   isAnonymous: boolean;
+  showAuthorGender: boolean;
+  showCommenterGender: boolean;
 }) {
   const isAnonymous = !input.userId || input.isAnonymous;
   const author = input.userId
@@ -217,6 +226,8 @@ export async function createCommunityPost(input: {
       readMinutes: Math.max(1, Math.ceil(input.body.length / 180)),
       tags: input.tags.length > 0 ? input.tags : ["새글"],
       isAnonymous,
+      showAuthorGender: Boolean(input.userId && input.showAuthorGender),
+      showCommenterGender: input.showCommenterGender,
     },
     include: {
       author: { select: authorSelect },
@@ -264,12 +275,18 @@ export async function createCommunityComment(input: {
   }
 
   const isAnonymous = !input.userId || input.isAnonymous;
-  const author = input.userId
-    ? await prisma.user.findUnique({
-        where: { id: input.userId },
-        select: { name: true, nickname: true },
-      })
-    : null;
+  const [author, post] = await Promise.all([
+    input.userId
+      ? prisma.user.findUnique({
+          where: { id: input.userId },
+          select: { name: true, nickname: true },
+        })
+      : null,
+    prisma.post.findUnique({
+      where: { id: input.postId },
+      select: { showCommenterGender: true },
+    }),
+  ]);
   const comment = await prisma.comment.create({
     data: {
       postId: input.postId,
@@ -288,7 +305,12 @@ export async function createCommunityComment(input: {
     },
   });
 
-  return toCommunityComment(comment, input.userId, input.anonKey);
+  return toCommunityComment(
+    comment,
+    input.userId,
+    input.anonKey,
+    post?.showCommenterGender ?? false,
+  );
 }
 
 export class CommentCooldownError extends Error {
@@ -318,7 +340,12 @@ export async function updateCommunityComment(input: {
     },
   });
 
-  return toCommunityComment(comment, input.userId, input.anonKey);
+  return toCommunityComment(
+    comment,
+    input.userId,
+    input.anonKey,
+    existing.post.showCommenterGender,
+  );
 }
 
 export async function deleteCommunityComment(input: {
@@ -727,6 +754,9 @@ function toCommunityPost(
     author: post.isAnonymous
       ? post.authorName
       : post.author?.nickname ?? post.author?.name ?? post.authorName,
+    authorGender: post.showAuthorGender
+      ? genderFromAuthor(post.author, true)
+      : undefined,
     authorVerifiedPersonaCount: post.isAnonymous
       ? 0
       : post.author?._count.personas ?? 0,
@@ -736,7 +766,12 @@ function toCommunityPost(
     createdAt: relativeTime(post.createdAt),
     readMinutes: post.readMinutes,
     comments: post.comments.map((comment) =>
-      toCommunityComment(comment, currentUserId, currentAnonKey),
+      toCommunityComment(
+        comment,
+        currentUserId,
+        currentAnonKey,
+        post.showCommenterGender,
+      ),
     ),
     ...summarizePostReactions(post.reactions, currentUserId),
     verdicts: post.verdictVotes.reduce<VerdictState>(
@@ -749,6 +784,8 @@ function toCommunityPost(
     myVerdict: ownVerdict ? verdictFromDb[ownVerdict.choice] : null,
     tags: post.tags,
     pinned: post.isPinned,
+    showAuthorGender: post.showAuthorGender,
+    showCommenterGender: post.showCommenterGender,
   };
 }
 
@@ -758,6 +795,7 @@ async function findCommentForManagement(commentId: string) {
     include: {
       author: { select: authorSelect },
       reactions: true,
+      post: { select: { showCommenterGender: true } },
     },
   });
   if (!comment) throw new CommentNotFoundError();
@@ -792,6 +830,7 @@ function toCommunityComment(
   comment: CommentWithAuthor,
   currentUserId?: string,
   currentAnonKey?: string,
+  showGender = false,
 ) {
   const actorKey = commentActorKey(currentUserId, currentAnonKey);
 
@@ -800,6 +839,7 @@ function toCommunityComment(
     author: comment.isAnonymous
       ? "익명"
       : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
+    authorGender: showGender ? genderFromAuthor(comment.author) : undefined,
     authorVerifiedPersonaCount: comment.isAnonymous
       ? 0
       : comment.author?._count.personas ?? 0,
@@ -809,6 +849,19 @@ function toCommunityComment(
     canManage: isCommentOwner(comment, currentUserId, currentAnonKey),
     ...summarizeCommentReactions(comment.reactions, actorKey),
   };
+}
+
+function genderFromAuthor(
+  author: AuthorSummary,
+  includePrivate = false,
+): GenderLabel | undefined {
+  const persona = author?.personas.find(
+    (item) => includePrivate || item.isPublic,
+  );
+
+  return persona?.value === "남성" || persona?.value === "여성"
+    ? persona.value
+    : undefined;
 }
 
 function summarizeCommentReactions(
