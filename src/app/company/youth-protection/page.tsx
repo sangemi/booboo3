@@ -10,7 +10,7 @@ import {
 import { legalEffectiveDate, operator } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "청소년 보호정책 | 부부라이프",
+  title: "청소년 보호정책",
   description: "부부라이프의 청소년 유해정보 차단과 보호 기준을 안내합니다.",
   alternates: { canonical: "https://booboolife.com/company/youth-protection" },
 };

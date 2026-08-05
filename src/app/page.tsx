@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
 import { auth } from "@/auth";
@@ -13,6 +14,18 @@ import {
   listAnonymousLetters,
   listCommunityPosts,
 } from "@/lib/community-service";
+import { SITE_DESCRIPTION } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: { absolute: "부부라이프 | 우리 부부 이야기" },
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    url: "/",
+    title: "부부라이프 | 우리 부부 이야기",
+    description: SITE_DESCRIPTION,
+  },
+};
 
 type HomePageProps = {
   searchParams: Promise<{ category?: string | string[] }>;

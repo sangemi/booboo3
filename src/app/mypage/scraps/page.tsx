@@ -10,7 +10,8 @@ import { categoryLabels } from "@/lib/community-data";
 import { listCommunityScraps } from "@/lib/community-service";
 
 export const metadata: Metadata = {
-  title: "내 스크랩 | 부부라이프",
+  title: "내 스크랩",
+  robots: { index: false, follow: false },
 };
 
 export default async function MyScrapsPage() {

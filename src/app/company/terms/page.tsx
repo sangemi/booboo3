@@ -11,7 +11,7 @@ import {
 import { legalEffectiveDate, operator } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "이용약관 | 부부라이프",
+  title: "이용약관",
   description: "부부라이프 커뮤니티의 가입, 게시물, 이용 제한 및 운영 기준을 안내합니다.",
   alternates: { canonical: "https://booboolife.com/company/terms" },
 };

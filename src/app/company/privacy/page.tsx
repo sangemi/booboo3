@@ -11,7 +11,7 @@ import {
 import { legalEffectiveDate, operator } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "개인정보처리방침 | 부부라이프",
+  title: "개인정보처리방침",
   description: "부부라이프가 처리하는 회원, 소셜 로그인, 게시물과 페르소나 정보를 안내합니다.",
   alternates: { canonical: "https://booboolife.com/company/privacy" },
 };

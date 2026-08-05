@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { AuthForm } from "@/components/booboo/auth-form";
@@ -5,6 +6,10 @@ import { SiteFooter } from "@/components/booboo/site-footer";
 import { SiteHeader } from "@/components/booboo/site-header";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "회원가입",
+  robots: { index: false, follow: false },
+};
 
 export default function RegisterPage() {
   return (

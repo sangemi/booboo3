@@ -68,6 +68,8 @@ export function BoobooApp({
   initialMission,
   initialCategory,
 }: BoobooAppProps = {}) {
+  const GoalHeading = initialPost ? "p" : "h1";
+  const PostHeading = initialPost ? "h1" : "h2";
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const [posts, setPosts] = useState<CommunityPost[]>(() =>
@@ -729,7 +731,7 @@ export function BoobooApp({
       <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 md:px-8 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_280px]">
         <section className="min-w-0 space-y-4">
           <div className="rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] px-4 py-3 text-[#6f6964] opacity-80 transition-opacity duration-200 hover:opacity-100 md:px-5">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-6 md:text-base">
+            <GoalHeading className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-normal leading-6 md:text-base">
               <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 text-[11px] font-bold text-[var(--plum)]">
                 <Sparkles className="size-3.5" />
                 목표
@@ -739,7 +741,7 @@ export function BoobooApp({
                 행복한 부부는 더 배우고 나누고, 다투는 부부는 건강하게 싸우는
                 연습을
               </span>
-            </p>
+            </GoalHeading>
           </div>
 
           <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] p-1 opacity-80 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -974,9 +976,9 @@ export function BoobooApp({
                     {categoryLabels[selectedPost.category]}
                   </span>
                 </div>
-                <h3 className="mt-4 font-serif text-[42px] font-bold leading-[1.24] text-[var(--foreground)]">
+                <PostHeading className="mt-4 font-serif text-[42px] font-bold leading-[1.24] text-[var(--foreground)]">
                   {selectedPost.title}
-                </h3>
+                </PostHeading>
                 <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 opacity-65">
                   <VerifiedName
                     name={selectedPost.author}
@@ -1585,7 +1587,10 @@ function CommentCard({
   }
 
   return (
-    <div className="rounded-[8px] bg-[#fbf6f0] p-3">
+    <div
+      id={`comment-${comment.id}`}
+      className="rounded-[8px] bg-[#fbf6f0] p-3"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
           <VerifiedName
@@ -1783,9 +1788,9 @@ function MobilePostDetail({
           {categoryLabels[post.category]}
         </span>
       </div>
-      <h3 className="mt-4 font-serif text-[34px] font-bold leading-[1.26] text-[var(--foreground)]">
+      <h2 className="mt-4 font-serif text-[34px] font-bold leading-[1.26] text-[var(--foreground)]">
         {post.title}
-      </h3>
+      </h2>
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 opacity-65">
         <VerifiedName
           name={post.author}

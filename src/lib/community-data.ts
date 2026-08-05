@@ -24,6 +24,8 @@ export type CommunityPost = {
   mood: MoodKey;
   temperature: number;
   createdAt: string;
+  createdAtIso?: string;
+  updatedAtIso?: string;
   readMinutes: number;
   comments: CommentItem[];
   reactions: ReactionState;
@@ -44,6 +46,8 @@ export type CommentItem = {
   body: string;
   tone: "support" | "advice" | "question";
   createdAt: string;
+  createdAtIso?: string;
+  updatedAtIso?: string;
   canManage?: boolean;
   upvotes?: number;
   downvotes?: number;

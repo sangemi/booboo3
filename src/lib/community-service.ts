@@ -192,6 +192,79 @@ export async function getCommunityPostByPublicId(
   return post ? toCommunityPost(post, userId, anonKey) : null;
 }
 
+export async function getCommunityPostSeoByPublicId(publicId: number) {
+  if (!Number.isSafeInteger(publicId) || publicId < 1) return null;
+
+  const post = await prisma.post.findUnique({
+    where: { publicId },
+    select: {
+      publicId: true,
+      category: true,
+      title: true,
+      body: true,
+      authorName: true,
+      createdAt: true,
+      updatedAt: true,
+      comments: {
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+        select: { updatedAt: true },
+      },
+    },
+  });
+
+  if (!post) return null;
+
+  const { comments, ...postData } = post;
+  return {
+    ...postData,
+    pageUpdatedAt:
+      comments[0]?.updatedAt && comments[0].updatedAt > post.updatedAt
+        ? comments[0].updatedAt
+        : post.updatedAt,
+  };
+}
+
+export async function listCommunityPostSeoEntries() {
+  const posts = await prisma.post.findMany({
+    select: {
+      publicId: true,
+      updatedAt: true,
+      comments: {
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+        select: { updatedAt: true },
+      },
+    },
+  });
+
+  return posts
+    .map(({ comments, ...post }) => ({
+      ...post,
+      pageUpdatedAt:
+        comments[0]?.updatedAt && comments[0].updatedAt > post.updatedAt
+          ? comments[0].updatedAt
+          : post.updatedAt,
+    }))
+    .sort((a, b) => b.pageUpdatedAt.getTime() - a.pageUpdatedAt.getTime());
+}
+
+export async function listCommunityFeedPosts(limit = 50) {
+  return prisma.post.findMany({
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      publicId: true,
+      category: true,
+      title: true,
+      body: true,
+      authorName: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
 export async function createCommunityPost(input: {
   category: keyof typeof categoryToDb;
   title: string;
@@ -744,6 +817,11 @@ function toCommunityPost(
   const ownVerdict = currentUserId
     ? post.verdictVotes.find((vote) => vote.userId === currentUserId)
     : undefined;
+  const pageUpdatedAt = post.comments.reduce(
+    (latest, comment) =>
+      comment.updatedAt > latest ? comment.updatedAt : latest,
+    post.updatedAt,
+  );
 
   return {
     id: post.id,
@@ -764,6 +842,8 @@ function toCommunityPost(
     mood: normalizeMood(post.mood),
     temperature: post.temperature ?? 70,
     createdAt: relativeTime(post.createdAt),
+    createdAtIso: post.createdAt.toISOString(),
+    updatedAtIso: pageUpdatedAt.toISOString(),
     readMinutes: post.readMinutes,
     comments: post.comments.map((comment) =>
       toCommunityComment(
@@ -846,6 +926,8 @@ function toCommunityComment(
     body: comment.body,
     tone: commentToneFromDb[comment.tone],
     createdAt: relativeTime(comment.createdAt),
+    createdAtIso: comment.createdAt.toISOString(),
+    updatedAtIso: comment.updatedAt.toISOString(),
     canManage: isCommentOwner(comment, currentUserId, currentAnonKey),
     ...summarizeCommentReactions(comment.reactions, actorKey),
   };

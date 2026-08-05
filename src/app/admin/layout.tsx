@@ -5,7 +5,7 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { getAdminUser } from "@/lib/admin-session";
 
 export const metadata: Metadata = {
-  title: "관리자 | 부부라이프",
+  title: "관리자",
   robots: { index: false, follow: false },
 };
 

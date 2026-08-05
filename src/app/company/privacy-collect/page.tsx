@@ -9,7 +9,7 @@ import {
 import { legalEffectiveDate, operator } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "개인정보 수집·이용 동의 | 부부라이프",
+  title: "개인정보 수집·이용 동의",
   description: "부부라이프 회원가입과 소셜 로그인에 필요한 개인정보 수집·이용 내용을 안내합니다.",
   alternates: { canonical: "https://booboolife.com/company/privacy-collect" },
 };

@@ -6,9 +6,11 @@ import { SiteFooter } from "@/components/booboo/site-footer";
 import { SiteHeader } from "@/components/booboo/site-header";
 
 export const metadata: Metadata = {
-  title: "소개 | 부부라이프",
+  title: "소개",
   description:
     "보통 부부의 일상과 갈등을 비난보다 회복 쪽으로 기록하는 부부 커뮤니티",
+  alternates: { canonical: "/about" },
+  openGraph: { url: "/about" },
 };
 
 const principles = [
