@@ -80,10 +80,11 @@ export function SiteHeader({
         <Link href="/" className="flex items-center gap-3">
           <Image
             src="/brand/booboolife-mark-192.png"
-            alt=""
+            alt="부부라이프 로고"
             width={44}
             height={44}
             priority
+            unoptimized
             className="size-11 shrink-0 object-contain"
           />
           <div>
