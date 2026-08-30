@@ -48,10 +48,11 @@ export function AiOperationsRoom() {
         <Link href="/" className={styles.brand}>
           <Image
             src="/brand/booboolife-mark-192.png"
-            alt=""
+            alt="부부라이프 로고"
             width={42}
             height={42}
             priority
+            unoptimized
           />
           <span>부부라이프</span>
         </Link>
