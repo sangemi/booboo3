@@ -357,11 +357,12 @@ export function ProfileManager() {
                           setEditingNickname(true);
                           clearFeedback();
                         }}
+                        aria-label="프로필 이름 수정"
                         aria-expanded={editingNickname}
-                        className="inline-flex h-7 items-center gap-1 rounded-[6px] px-2 text-xs text-[var(--ink-soft)] opacity-65 hover:bg-[#faf7f4] hover:opacity-100"
+                        title="프로필 이름 수정"
+                        className="grid size-7 place-items-center rounded-[6px] text-[var(--ink-soft)] opacity-65 hover:bg-[#faf7f4] hover:opacity-100"
                       >
-                        <Pencil className="size-3" />
-                        에디트
+                        <Pencil className="size-3.5" />
                       </button>
                     </div>
                   )}
