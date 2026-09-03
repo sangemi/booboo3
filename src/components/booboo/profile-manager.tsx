@@ -9,6 +9,7 @@ import {
   LoaderCircle,
   LockKeyhole,
   LogOut,
+  Pencil,
   Plus,
   ShieldCheck,
   Trash2,
@@ -90,6 +91,7 @@ export function ProfileManager() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [nickname, setNickname] = useState("");
+  const [editingNickname, setEditingNickname] = useState(false);
   const [personaType, setPersonaType] = useState<PersonaType>("MARRIAGE_YEARS");
   const [personaValue, setPersonaValue] = useState("");
   const [personaPublic, setPersonaPublic] = useState(true);
@@ -150,6 +152,7 @@ export function ProfileManager() {
     } else {
       setMessage("닉네임을 저장했습니다.");
       await Promise.all([loadProfile(), updateSession()]);
+      setEditingNickname(false);
     }
 
     setSaving(false);
@@ -246,37 +249,8 @@ export function ProfileManager() {
 
   return (
     <main className="mx-auto w-full max-w-[1040px] flex-1 px-4 py-6 md:px-8 md:py-10">
-      <section className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
-        <div className="grid gap-5 border-b border-[var(--line)] bg-[#fff9f3] p-5 md:grid-cols-[auto_1fr_auto] md:items-center md:p-7">
-          <div
-            className={`grid size-16 place-items-center rounded-full bg-white text-xl font-bold text-[var(--plum)] ${verificationRing(profile.verifiedPersonaCount)}`}
-          >
-            {displayName.slice(0, 1)}
-          </div>
-          <div className="min-w-0">
-            <VerifiedName
-              name={displayName}
-              verifiedCount={profile.verifiedPersonaCount}
-            />
-            <p className="mt-1 truncate text-sm text-[var(--ink-soft)]">
-              {profile.email}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
-              인증된 페르소나 {profile.verifiedPersonaCount}개 · 모든 회원의 커뮤니티 이용 권한은 같습니다.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => signOut({ redirectTo: "/" })}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] px-3 text-sm font-bold text-[var(--ink-soft)] hover:bg-white md:justify-self-end"
-          >
-            <LogOut className="size-4" />
-            로그아웃
-          </button>
-        </div>
-
-        <div className="grid md:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="border-b border-[var(--line)] p-5 md:border-b-0 md:border-r md:p-6">
+      <section className="overflow-hidden rounded-[8px] border border-[var(--line)] bg-white md:grid md:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="border-b border-[var(--line)] bg-[#fff9f3] p-5 md:border-b-0 md:border-r md:p-6">
             <h1 className="font-serif text-2xl font-bold">마이페이지</h1>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
               나를 설명하는 정보 가운데 공개할 것만 골라 관리하세요.
@@ -329,26 +303,98 @@ export function ProfileManager() {
           </aside>
 
           <div className="min-w-0 p-5 md:p-7">
-            <section>
-              <h2 className="text-lg font-bold">프로필 이름</h2>
-              <form onSubmit={saveNickname} className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={nickname}
-                  onChange={(event) => setNickname(event.target.value)}
-                  className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)] focus:ring-4 focus:ring-[rgba(111,61,91,0.1)]"
-                  aria-label="닉네임"
-                />
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="h-10 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white disabled:opacity-55"
+            <section className="border-b border-[var(--line)] pb-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div
+                  className={`grid size-16 shrink-0 place-items-center rounded-full bg-[#fff9f3] text-xl font-bold text-[var(--plum)] ${verificationRing(profile.verifiedPersonaCount)}`}
                 >
-                  이름 저장
+                  {displayName.slice(0, 1)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  {editingNickname ? (
+                    <form onSubmit={saveNickname}>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <input
+                          value={nickname}
+                          onChange={(event) => setNickname(event.target.value)}
+                          className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)] focus:ring-4 focus:ring-[rgba(111,61,91,0.1)]"
+                          aria-label="프로필 이름"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={saving}
+                            className="h-10 flex-1 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white disabled:opacity-55 sm:flex-none"
+                          >
+                            저장
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => {
+                              setNickname(displayName);
+                              setEditingNickname(false);
+                              clearFeedback();
+                            }}
+                            className="h-10 flex-1 rounded-[8px] border border-[var(--line)] px-4 text-sm text-[var(--ink-soft)] disabled:opacity-55 sm:flex-none"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <VerifiedName
+                        name={displayName}
+                        verifiedCount={profile.verifiedPersonaCount}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNickname(displayName);
+                          setEditingNickname(true);
+                          clearFeedback();
+                        }}
+                        aria-expanded={editingNickname}
+                        className="inline-flex h-7 items-center gap-1 rounded-[6px] px-2 text-xs text-[var(--ink-soft)] opacity-65 hover:bg-[#faf7f4] hover:opacity-100"
+                      >
+                        <Pencil className="size-3" />
+                        에디트
+                      </button>
+                    </div>
+                  )}
+                  <p className="mt-1 truncate text-sm text-[var(--ink-soft)]">
+                    {profile.email}
+                  </p>
+                  <p className="mt-2 text-sm text-[var(--ink-soft)]">
+                    인증된 페르소나 {profile.verifiedPersonaCount}개
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => signOut({ redirectTo: "/" })}
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-[7px] border border-[var(--line)] px-3 text-xs font-bold text-[var(--ink-soft)] hover:bg-[#faf7f4]"
+                >
+                  <LogOut className="size-3.5" />
+                  로그아웃
                 </button>
-              </form>
+              </div>
             </section>
 
-            <section className="mt-8 border-t border-[var(--line)] pt-7">
+            {message ? (
+              <p className="mt-4 rounded-[8px] bg-[#edf6ef] px-3 py-2 text-sm text-[#356447]">
+                {message}
+              </p>
+            ) : null}
+            {error ? (
+              <p role="alert" className="mt-4 rounded-[8px] bg-[#fff0ed] px-3 py-2 text-sm text-[#a33c32]">
+                {error}
+              </p>
+            ) : null}
+
+            <section className="mt-7">
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-bold">내 페르소나</h2>
@@ -465,18 +511,7 @@ export function ProfileManager() {
               </div>
             </section>
 
-            {message ? (
-              <p className="mt-5 rounded-[8px] bg-[#edf6ef] px-3 py-2 text-sm text-[#356447]">
-                {message}
-              </p>
-            ) : null}
-            {error ? (
-              <p role="alert" className="mt-5 rounded-[8px] bg-[#fff0ed] px-3 py-2 text-sm text-[#a33c32]">
-                {error}
-              </p>
-            ) : null}
           </div>
-        </div>
       </section>
     </main>
   );
