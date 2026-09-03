@@ -833,6 +833,7 @@ export function BoobooApp({
         onQueryChange={setQuery}
         onWriteClick={() => setComposerOpen((value) => !value)}
         muted
+        hiddenOnMobile={mobileDetailOpen}
       />
 
       <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 md:px-8 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_280px]">

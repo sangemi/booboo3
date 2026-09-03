@@ -26,6 +26,7 @@ type SiteHeaderProps = {
   onQueryChange?: (value: string) => void;
   onWriteClick?: () => void;
   muted?: boolean;
+  hiddenOnMobile?: boolean;
 };
 
 const navItems = [
@@ -39,6 +40,7 @@ export function SiteHeader({
   onQueryChange,
   onWriteClick,
   muted = false,
+  hiddenOnMobile = false,
 }: SiteHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -72,6 +74,7 @@ export function SiteHeader({
     <header
       className={cn(
         "relative z-[80] border-b border-[var(--line)] bg-[rgba(255,250,246,0.9)] backdrop-blur",
+        hiddenOnMobile && "hidden xl:block",
         muted &&
           "opacity-80 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100",
       )}
