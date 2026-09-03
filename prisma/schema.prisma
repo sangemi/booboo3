@@ -18,6 +18,7 @@ enum PostCategory {
 }
 
 enum ReactionType {
+  EMPATHY
   ME_TOO
   HUG
   SAVED

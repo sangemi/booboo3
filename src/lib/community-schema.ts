@@ -60,7 +60,7 @@ export const createCommentReactionSchema = z.object({
 });
 
 export const createReactionSchema = z.object({
-  type: z.enum(["meToo", "hug", "helpful"]),
+  type: z.literal("empathy"),
 });
 
 export const toggleScrapSchema = z.object({

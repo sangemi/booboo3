@@ -119,10 +119,8 @@ export const categoryFromDb = {
 } as const;
 
 export const reactionToDb = {
-  meToo: ReactionType.ME_TOO,
-  hug: ReactionType.HUG,
+  empathy: ReactionType.EMPATHY,
   saved: ReactionType.SAVED,
-  helpful: ReactionType.HELPFUL,
 } as const;
 
 export const commentToneToDb = {
@@ -145,13 +143,6 @@ const commentReactionToDb = {
 const commentReactionFromDb = {
   [CommentReactionType.UP]: "up",
   [CommentReactionType.DOWN]: "down",
-} as const;
-
-const reactionFromDb = {
-  [ReactionType.ME_TOO]: "meToo",
-  [ReactionType.HUG]: "hug",
-  [ReactionType.SAVED]: "saved",
-  [ReactionType.HELPFUL]: "helpful",
 } as const;
 
 export const verdictToDb = {
@@ -1252,22 +1243,28 @@ function summarizePostReactions(
   reactions: ReactionModel[],
   currentUserId?: string,
 ): { reactions: ReactionState; myReactions: ReactionSelection } {
-  const counts = reactions.reduce<ReactionState>(
-    (state, reaction) => {
-      state[reactionFromDb[reaction.type]] += 1;
-      return state;
-    },
-    { meToo: 0, hug: 0, saved: 0, helpful: 0 },
-  );
-  const selected = reactions.reduce<ReactionSelection>(
-    (state, reaction) => {
-      if (currentUserId && reaction.userId === currentUserId) {
-        state[reactionFromDb[reaction.type]] = true;
-      }
-      return state;
-    },
-    { meToo: false, hug: false, saved: false, helpful: false },
-  );
+  const counts: ReactionState = {
+    empathy: reactions.filter(
+      (reaction) => reaction.type === ReactionType.EMPATHY,
+    ).length,
+    saved: reactions.filter(
+      (reaction) => reaction.type === ReactionType.SAVED,
+    ).length,
+  };
+  const selected: ReactionSelection = {
+    empathy: reactions.some(
+      (reaction) =>
+        reaction.type === ReactionType.EMPATHY &&
+        Boolean(currentUserId) &&
+        reaction.userId === currentUserId,
+    ),
+    saved: reactions.some(
+      (reaction) =>
+        reaction.type === ReactionType.SAVED &&
+        Boolean(currentUserId) &&
+        reaction.userId === currentUserId,
+    ),
+  };
 
   return { reactions: counts, myReactions: selected };
 }

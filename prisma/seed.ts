@@ -21,10 +21,8 @@ const categoryToDb = {
 } as const;
 
 const reactionToDb = {
-  meToo: ReactionType.ME_TOO,
-  hug: ReactionType.HUG,
+  empathy: ReactionType.EMPATHY,
   saved: ReactionType.SAVED,
-  helpful: ReactionType.HELPFUL,
 } as const;
 
 const commentToneToDb = {

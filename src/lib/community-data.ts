@@ -63,17 +63,13 @@ export type CommentItem = {
 };
 
 export type ReactionState = {
-  meToo: number;
-  hug: number;
+  empathy: number;
   saved: number;
-  helpful: number;
 };
 
 export type ReactionSelection = {
-  meToo: boolean;
-  hug: boolean;
+  empathy: boolean;
   saved: boolean;
-  helpful: boolean;
 };
 
 export type VerdictState = {
@@ -317,7 +313,7 @@ export const seedPosts: CommunityPost[] = [
     readMinutes: 3,
     tags: ["퇴근", "육아", "집안일"],
     pinned: true,
-    reactions: { meToo: 84, hug: 39, saved: 22, helpful: 17 },
+    reactions: { empathy: 140, saved: 22 },
     verdicts: { husband: 14, wife: 22, both: 41, notEnough: 9 },
     comments: [
       {
@@ -350,7 +346,7 @@ export const seedPosts: CommunityPost[] = [
     createdAt: "34분 전",
     readMinutes: 1,
     tags: ["칭찬", "일상"],
-    reactions: { meToo: 152, hug: 24, saved: 11, helpful: 7 },
+    reactions: { empathy: 183, saved: 11 },
     verdicts: { husband: 1, wife: 1, both: 8, notEnough: 3 },
     comments: [
       {
@@ -376,7 +372,7 @@ export const seedPosts: CommunityPost[] = [
     createdAt: "1시간 전",
     readMinutes: 4,
     tags: ["집안일", "대화법", "루틴"],
-    reactions: { meToo: 97, hug: 18, saved: 64, helpful: 82 },
+    reactions: { empathy: 197, saved: 64 },
     verdicts: { husband: 4, wife: 5, both: 17, notEnough: 6 },
     comments: [
       {
@@ -402,7 +398,7 @@ export const seedPosts: CommunityPost[] = [
     createdAt: "2시간 전",
     readMinutes: 2,
     tags: ["데이트", "요리", "기념일"],
-    reactions: { meToo: 61, hug: 9, saved: 43, helpful: 25 },
+    reactions: { empathy: 95, saved: 43 },
     verdicts: { husband: 0, wife: 0, both: 3, notEnough: 1 },
     comments: [],
   },
@@ -420,7 +416,7 @@ export const seedPosts: CommunityPost[] = [
     createdAt: "3시간 전",
     readMinutes: 3,
     tags: ["육아", "사과", "갈등"],
-    reactions: { meToo: 73, hug: 36, saved: 29, helpful: 31 },
+    reactions: { empathy: 140, saved: 29 },
     verdicts: { husband: 3, wife: 6, both: 19, notEnough: 8 },
     comments: [
       {

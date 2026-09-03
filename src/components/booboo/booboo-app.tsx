@@ -11,7 +11,6 @@ import {
   MessageCircle,
   Pencil,
   Send,
-  Smile,
   Sparkles,
   ThumbsDown,
   ThumbsUp,
@@ -1047,7 +1046,7 @@ export function BoobooApp({
                       <div className="flex items-center gap-2 text-[11px] font-bold">
                         <span className="inline-flex items-center gap-1 text-[var(--coral)]">
                           <Heart className="size-3.5" />
-                          {post.reactions.meToo}
+                          {post.reactions.empathy}
                         </span>
                         <span className="inline-flex items-center gap-1 text-[var(--leaf)]">
                           <MessageCircle className="size-3.5" />
@@ -2132,29 +2131,12 @@ function PostActions({
 
   return (
     <div className="mt-4 flex items-stretch gap-1.5">
-      <div className="grid min-w-0 flex-1 grid-cols-3 overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
-        <ReactionButton
-          icon={Heart}
-          label="나도 그래요"
-          value={post.reactions.meToo}
-          selected={post.myReactions?.meToo ?? false}
-          onClick={() => onReact("meToo")}
-        />
-        <ReactionButton
-          icon={Smile}
-          label="응원해요"
-          value={post.reactions.hug}
-          selected={post.myReactions?.hug ?? false}
-          onClick={() => onReact("hug")}
-        />
-        <ReactionButton
-          icon={ThumbsUp}
-          label="도움돼요"
-          value={post.reactions.helpful}
-          selected={post.myReactions?.helpful ?? false}
-          onClick={() => onReact("helpful")}
-        />
-      </div>
+      <ReactionButton
+        label="공감해요"
+        value={post.reactions.empathy}
+        selected={post.myReactions?.empathy ?? false}
+        onClick={() => onReact("empathy")}
+      />
       <button
         type="button"
         aria-pressed={bookmarked}
@@ -2175,13 +2157,11 @@ function PostActions({
 }
 
 function ReactionButton({
-  icon: Icon,
   label,
   value,
   selected,
   onClick,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
   selected: boolean;
@@ -2191,17 +2171,24 @@ function ReactionButton({
     <button
       type="button"
       aria-pressed={selected}
+      aria-label={value > 0 ? `${label} ${value}` : label}
       onClick={onClick}
       className={cn(
-        "flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 border-r border-[var(--line)] px-1 text-[10px] font-bold transition last:border-r-0",
+        "inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[8px] border px-4 text-sm font-bold transition",
         selected
-          ? "bg-[#fff0eb] text-[var(--coral)]"
-          : "text-[var(--ink-soft)] hover:bg-[#fff6f2] hover:text-[var(--foreground)]",
+          ? "border-[var(--coral)] bg-[#fff0eb] text-[var(--coral)]"
+          : "border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--coral)] hover:bg-[#fff6f2] hover:text-[var(--foreground)]",
       )}
     >
-      <Icon className="size-3 shrink-0 text-[var(--coral)]" />
-      <span className="whitespace-nowrap leading-4">{label}</span>
-      <span className="text-[10px] font-normal">{value}</span>
+      <Heart
+        className={cn(
+          "size-4 shrink-0 text-[var(--coral)]",
+          selected ? "fill-current" : "",
+        )}
+        aria-hidden="true"
+      />
+      <span className="whitespace-nowrap">{label}</span>
+      {value > 0 ? <span className="text-xs font-normal">{value}</span> : null}
     </button>
   );
 }
