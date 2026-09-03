@@ -269,6 +269,7 @@ model Comment {
   anonKey         String?
   authorName      String      @default("방문자")
   isAnonymous     Boolean     @default(true)
+  anonymousAlias  String?
   body            String
   tone            CommentTone @default(SUPPORT)
   personaSnapshots Json        @default("[]")

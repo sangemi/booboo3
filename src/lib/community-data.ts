@@ -47,6 +47,7 @@ export type CommunityPost = {
 export type CommentItem = {
   id: string;
   author: string;
+  isAnonymous?: boolean;
   authorGender?: GenderLabel;
   personas?: CommentPersonaSnapshot[];
   authorVerifiedPersonaCount?: number;

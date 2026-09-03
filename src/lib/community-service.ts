@@ -36,6 +36,10 @@ import {
   type CommentPersonaSnapshot,
   type CommentPersonaType,
 } from "@/lib/comment-persona";
+import {
+  anonymousCommentAlias,
+  anonymousCommentAliasCount,
+} from "@/lib/anonymous-comment-alias";
 import { dailyMissionSelection, missions } from "@/lib/community-data";
 import { prisma } from "@/lib/db";
 import { formatMarriageYear, parseMarriageYear } from "@/lib/marriage-persona";
@@ -60,6 +64,11 @@ type CommentWithAuthor = CommentModel & {
   author: AuthorSummary;
   reactions: CommentReactionModel[];
 };
+
+type AnonymousAliasSource = Pick<
+  CommentModel,
+  "id" | "postId" | "authorId" | "anonKey" | "isAnonymous" | "anonymousAlias"
+>;
 
 type PostWithRelations = PostModel & {
   author: AuthorSummary;
@@ -413,23 +422,83 @@ export async function createCommunityComment(input: {
     input.personaDisclosures,
     author?.personas ?? [],
   );
-  const comment = await prisma.comment.create({
-    data: {
-      postId: input.postId,
-      body: input.body,
-      tone: commentToneToDb[input.tone],
-      authorId: input.userId,
-      anonKey: input.userId ? null : input.anonKey,
-      authorName: isAnonymous
-        ? "익명"
-        : author?.nickname ?? author?.name ?? "부부라이프 회원",
-      isAnonymous,
-      personaSnapshots,
-    },
-    include: {
-      author: { select: authorSelect },
-      reactions: true,
-    },
+  const comment = await prisma.$transaction(async (transaction) => {
+    let alias: string | null = null;
+
+    if (isAnonymous) {
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext('booboolife-comment-alias'),
+          hashtext(${input.postId})
+        )
+      `;
+
+      const existingComments = await transaction.comment.findMany({
+        where: { postId: input.postId, isAnonymous: true },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          postId: true,
+          authorId: true,
+          anonKey: true,
+          isAnonymous: true,
+          anonymousAlias: true,
+        },
+      });
+      const fallbackAliases = assignFallbackAnonymousAliases(existingComments);
+      const actorKey = commentActorKey(input.userId, input.anonKey);
+      const previousComment = actorKey
+        ? existingComments.find(
+            (item) => storedCommentActorKey(item) === actorKey,
+          )
+        : undefined;
+
+      alias = previousComment
+        ? previousComment.anonymousAlias ??
+          fallbackAliases.get(previousComment.id) ??
+          null
+        : null;
+      if (!alias) {
+        const usedAliases = new Set(
+          existingComments.flatMap((item) =>
+            item.anonymousAlias
+              ? [item.anonymousAlias]
+              : fallbackAliases.has(item.id)
+                ? [fallbackAliases.get(item.id)!]
+                : [],
+          ),
+        );
+        const seed = `${input.postId}:${actorKey ?? crypto.randomUUID()}`;
+
+        for (let offset = 0; offset < anonymousCommentAliasCount; offset += 1) {
+          const candidate = anonymousCommentAlias(seed, offset);
+          if (!usedAliases.has(candidate)) {
+            alias = candidate;
+            break;
+          }
+        }
+      }
+    }
+
+    return transaction.comment.create({
+      data: {
+        postId: input.postId,
+        body: input.body,
+        tone: commentToneToDb[input.tone],
+        authorId: input.userId,
+        anonKey: input.userId ? null : input.anonKey,
+        authorName: isAnonymous
+          ? "익명"
+          : author?.nickname ?? author?.name ?? "부부라이프 회원",
+        isAnonymous,
+        anonymousAlias: alias,
+        personaSnapshots,
+      },
+      include: {
+        author: { select: authorSelect },
+        reactions: true,
+      },
+    });
   });
 
   return toCommunityComment(comment, input.userId, input.anonKey);
@@ -872,6 +941,7 @@ function toCommunityPost(
       comment.updatedAt > latest ? comment.updatedAt : latest,
     post.updatedAt,
   );
+  const fallbackAnonymousAliases = assignFallbackAnonymousAliases(post.comments);
 
   return {
     id: post.id,
@@ -896,7 +966,12 @@ function toCommunityPost(
     updatedAtIso: pageUpdatedAt.toISOString(),
     readMinutes: post.readMinutes,
     comments: post.comments.map((comment) =>
-      toCommunityComment(comment, currentUserId, currentAnonKey),
+      toCommunityComment(
+        comment,
+        currentUserId,
+        currentAnonKey,
+        comment.anonymousAlias ?? fallbackAnonymousAliases.get(comment.id),
+      ),
     ),
     ...summarizePostReactions(post.reactions, currentUserId),
     verdicts: post.verdictVotes.reduce<VerdictState>(
@@ -959,6 +1034,7 @@ function toCommunityComment(
   comment: CommentWithAuthor,
   currentUserId?: string,
   currentAnonKey?: string,
+  resolvedAnonymousAlias?: string,
 ) {
   const actorKey = commentActorKey(currentUserId, currentAnonKey);
   const personas = mergeCommentPersonas(
@@ -972,8 +1048,11 @@ function toCommunityComment(
   return {
     id: comment.id,
     author: comment.isAnonymous
-      ? "익명"
+      ? resolvedAnonymousAlias ??
+        comment.anonymousAlias ??
+        anonymousCommentAlias(`${comment.postId}:comment:${comment.id}`)
       : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
+    isAnonymous: comment.isAnonymous,
     authorGender,
     personas,
     authorVerifiedPersonaCount: comment.isAnonymous
@@ -987,6 +1066,50 @@ function toCommunityComment(
     canManage: isCommentOwner(comment, currentUserId, currentAnonKey),
     ...summarizeCommentReactions(comment.reactions, actorKey),
   };
+}
+
+function assignFallbackAnonymousAliases(comments: AnonymousAliasSource[]) {
+  const aliasesByCommentId = new Map<string, string>();
+  const aliasesByActor = new Map<string, string>();
+  const usedAliases = new Set(
+    comments.flatMap((comment) =>
+      comment.anonymousAlias ? [comment.anonymousAlias] : [],
+    ),
+  );
+
+  for (const comment of comments) {
+    if (!comment.isAnonymous || !comment.anonymousAlias) continue;
+    const actorKey = storedCommentActorKey(comment);
+    if (actorKey) aliasesByActor.set(actorKey, comment.anonymousAlias);
+  }
+
+  for (const comment of comments) {
+    if (!comment.isAnonymous || comment.anonymousAlias) continue;
+    const actorKey = storedCommentActorKey(comment);
+    const existingAlias = actorKey ? aliasesByActor.get(actorKey) : undefined;
+    if (existingAlias) {
+      aliasesByCommentId.set(comment.id, existingAlias);
+      continue;
+    }
+
+    const seed = `${comment.postId}:${actorKey ?? `comment:${comment.id}`}`;
+    for (let offset = 0; offset < anonymousCommentAliasCount; offset += 1) {
+      const candidate = anonymousCommentAlias(seed, offset);
+      if (!usedAliases.has(candidate)) {
+        aliasesByCommentId.set(comment.id, candidate);
+        usedAliases.add(candidate);
+        if (actorKey) aliasesByActor.set(actorKey, candidate);
+        break;
+      }
+    }
+  }
+
+  return aliasesByCommentId;
+}
+
+function storedCommentActorKey(comment: AnonymousAliasSource) {
+  if (comment.authorId) return `user:${comment.authorId}`;
+  return comment.anonKey ? `anon:${comment.anonKey}` : undefined;
 }
 
 function resolveCommentPersonaSnapshots(

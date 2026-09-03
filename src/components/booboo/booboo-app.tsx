@@ -1713,11 +1713,19 @@ function CommentCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
-          <VerifiedName
-            name={comment.author}
-            verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
-            compact
-          />
+          <span
+            title={
+              comment.isAnonymous
+                ? "이 글에서만 쓰는 랜덤 익명 이름입니다."
+                : undefined
+            }
+          >
+            <VerifiedName
+              name={comment.author}
+              verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
+              compact
+            />
+          </span>
           <CommentPersonaBadges comment={comment} />
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
