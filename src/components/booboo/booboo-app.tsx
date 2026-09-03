@@ -25,6 +25,11 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { VerifiedName } from "@/components/booboo/verified-name";
 import {
+  CommentPersonaDialog,
+  CommentPersonaRequestEditor,
+  type ProfilePersonaOption,
+} from "@/components/booboo/comment-persona-controls";
+import {
   categories,
   categoryLabels,
   CategoryKey,
@@ -39,6 +44,12 @@ import {
   VerdictState,
 } from "@/lib/community-data";
 import { cn } from "@/lib/utils";
+import {
+  commentPersonaLabels,
+  defaultCommentPersonaRequests,
+  type CommentPersonaDisclosure,
+  type CommentPersonaRequest,
+} from "@/lib/comment-persona";
 import { SiteFooter } from "@/components/booboo/site-footer";
 import { SiteHeader } from "@/components/booboo/site-header";
 
@@ -105,7 +116,7 @@ export function BoobooApp({
     body: "",
     category: "talk" as Exclude<CategoryKey, "all">,
     showAuthorGender: false,
-    showCommenterGender: true,
+    commentPersonaRequests: [...defaultCommentPersonaRequests],
   });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [commentSubmitErrors, setCommentSubmitErrors] = useState<
@@ -118,6 +129,14 @@ export function BoobooApp({
   const [selectedLetterId, setSelectedLetterId] = useState<string | null>(null);
   const [pendingLetterReaction, setPendingLetterReaction] = useState(false);
   const [postSubmitError, setPostSubmitError] = useState("");
+  const [profilePersonas, setProfilePersonas] = useState<
+    ProfilePersonaOption[] | null
+  >(null);
+  const [commentPersonaDialog, setCommentPersonaDialog] = useState<{
+    postId: string;
+    requests: CommentPersonaRequest[];
+    personas: ProfilePersonaOption[];
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -277,6 +296,23 @@ export function BoobooApp({
     };
   }, [missionOpen]);
 
+  useEffect(() => {
+    if (!commentPersonaDialog) return;
+
+    const originalOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCommentPersonaDialog(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [commentPersonaDialog]);
+
   function selectPost(post: CommunityPost) {
     setSelectedPostId(post.id);
     setMobileDetailOpen(true);
@@ -374,7 +410,10 @@ export function BoobooApp({
           tags: ["새글"],
           isAnonymous: !postAsMe,
           showAuthorGender: newPost.showAuthorGender,
-          showCommenterGender: newPost.showCommenterGender,
+          showCommenterGender: newPost.commentPersonaRequests.some(
+            (request) => request.type === "GENDER",
+          ),
+          commentPersonaRequests: newPost.commentPersonaRequests,
         }),
       });
 
@@ -402,7 +441,7 @@ export function BoobooApp({
       body: "",
       category: "talk",
       showAuthorGender: false,
-      showCommenterGender: true,
+      commentPersonaRequests: [...defaultCommentPersonaRequests],
     });
     setPostAsMe(false);
     setComposerOpen(false);
@@ -451,6 +490,61 @@ export function BoobooApp({
     if (!draft || commentCoolingDown) return;
     setCommentSubmitErrors((current) => ({ ...current, [postId]: "" }));
 
+    const post = posts.find((item) => item.id === postId);
+    const requests = post ? personaRequestsForPost(post) : [];
+    if (requests.length === 0) {
+      await persistComment(postId, draft, []);
+      return;
+    }
+
+    const personas = session?.user ? await loadProfilePersonas() : [];
+    const disclosures: CommentPersonaDisclosure[] = [];
+    const shouldAsk = requests.some((request) => {
+      const publicOptions = personas.filter(
+        (persona) => persona.type === request.type && persona.isPublic,
+      );
+      if (publicOptions.length === 1) {
+        disclosures.push({
+          type: request.type,
+          personaId: publicOptions[0].id,
+        });
+        return false;
+      }
+      return true;
+    });
+
+    if (shouldAsk) {
+      setCommentPersonaDialog({ postId, requests, personas });
+      return;
+    }
+
+    await persistComment(postId, draft, disclosures);
+  }
+
+  async function loadProfilePersonas() {
+    if (profilePersonas) return profilePersonas;
+
+    try {
+      const response = await fetch("/api/profile", { cache: "no-store" });
+      if (!response.ok) return [];
+      const payload = (await response.json()) as {
+        personas?: ProfilePersonaOption[];
+      };
+      const personas = payload.personas ?? [];
+      setProfilePersonas(personas);
+      return personas;
+    } catch {
+      return [];
+    }
+  }
+
+  async function persistComment(
+    postId: string,
+    draft: string,
+    personaDisclosures: CommentPersonaDisclosure[],
+  ) {
+    setCommentSubmitErrors((current) => ({ ...current, [postId]: "" }));
+
     try {
       const response = await fetch(`/api/community/posts/${postId}/comments`, {
         method: "POST",
@@ -459,6 +553,7 @@ export function BoobooApp({
           body: draft,
           tone: "support",
           isAnonymous: !commentAsMe,
+          personaDisclosures,
         }),
       });
 
@@ -466,6 +561,7 @@ export function BoobooApp({
         comment?: CommentItem;
         error?: string;
         retryAfterSeconds?: number;
+        missingTypes?: CommentPersonaRequest["type"][];
       };
 
       if (response.status === 429) {
@@ -475,7 +571,17 @@ export function BoobooApp({
           ...current,
           [postId]: `댓글은 10초에 한 번 작성할 수 있습니다. ${retryAfterSeconds}초 후 다시 시도해 주세요.`,
         }));
-        return;
+        return false;
+      }
+
+      if (response.status === 409 && payload.missingTypes?.length) {
+        const post = posts.find((item) => item.id === postId);
+        setCommentPersonaDialog({
+          postId,
+          requests: post ? personaRequestsForPost(post) : [],
+          personas: session?.user ? await loadProfilePersonas() : [],
+        });
+        return false;
       }
 
       if (response.ok && payload.comment) {
@@ -488,7 +594,7 @@ export function BoobooApp({
         );
         setCommentDrafts((current) => ({ ...current, [postId]: "" }));
         setCommentCooldownSeconds(10);
-        return;
+        return true;
       }
     } catch {
       // The error below keeps unsaved comments from looking published.
@@ -498,6 +604,7 @@ export function BoobooApp({
       [postId]:
         "댓글을 저장하지 못했습니다. 작성한 내용은 그대로 두었으니 다시 시도해 주세요.",
     }));
+    return false;
   }
 
   async function updateComment(
@@ -850,38 +957,31 @@ export function BoobooApp({
                       익명으로 올라갑니다.
                     </p>
                   )}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--ink-soft)] opacity-70">
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap">
+                  <CommentPersonaRequestEditor
+                    value={newPost.commentPersonaRequests}
+                    onChange={(commentPersonaRequests) =>
+                      setNewPost((current) => ({
+                        ...current,
+                        commentPersonaRequests,
+                      }))
+                    }
+                  />
+                  {session?.user ? (
+                    <label className="mt-3 inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-[var(--ink-soft)] opacity-70">
                       <input
                         type="checkbox"
-                        checked={newPost.showCommenterGender}
+                        checked={newPost.showAuthorGender}
                         onChange={(event) =>
                           setNewPost((current) => ({
                             ...current,
-                            showCommenterGender: event.target.checked,
+                            showAuthorGender: event.target.checked,
                           }))
                         }
                         className="size-3.5 accent-[var(--plum)]"
                       />
-                      댓글에 성별 표시
+                      글쓴이 성별 표시
                     </label>
-                    {session?.user ? (
-                      <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={newPost.showAuthorGender}
-                          onChange={(event) =>
-                            setNewPost((current) => ({
-                              ...current,
-                              showAuthorGender: event.target.checked,
-                            }))
-                          }
-                          className="size-3.5 accent-[var(--plum)]"
-                        />
-                        글쓴이 성별 표시
-                      </label>
-                    ) : null}
-                  </div>
+                  ) : null}
                 </div>
                 <button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white">
                   <Send className="size-4" />
@@ -1027,11 +1127,7 @@ export function BoobooApp({
                     <h4 className="text-sm font-extrabold">
                       댓글 {selectedPost.comments.length}
                     </h4>
-                    {selectedPost.showCommenterGender ? (
-                      <span className="text-[10px] font-bold text-[var(--ink-soft)]">
-                        댓글에 성별 표시
-                      </span>
-                    ) : null}
+                    <CommentPersonaRequestSummary post={selectedPost} />
                   </div>
                   <div className="mt-3 space-y-3">
                     {selectedPost.comments.length > 0 ? (
@@ -1412,6 +1508,30 @@ export function BoobooApp({
         </div>
       ) : null}
 
+      {commentPersonaDialog ? (
+        <CommentPersonaDialog
+          open
+          requests={commentPersonaDialog.requests}
+          personas={commentPersonaDialog.personas}
+          signedIn={Boolean(session?.user)}
+          onClose={() => setCommentPersonaDialog(null)}
+          onConfirm={async (personaDisclosures) => {
+            const draft = commentDrafts[commentPersonaDialog.postId]?.trim();
+            if (!draft) return false;
+            const saved = await persistComment(
+              commentPersonaDialog.postId,
+              draft,
+              personaDisclosures,
+            );
+            if (saved) {
+              setCommentPersonaDialog(null);
+              setProfilePersonas(null);
+            }
+            return saved;
+          }}
+        />
+      ) : null}
+
       <SiteFooter />
     </main>
   );
@@ -1598,7 +1718,7 @@ function CommentCard({
             verifiedCount={comment.authorVerifiedPersonaCount ?? 0}
             compact
           />
-          <GenderBadge gender={comment.authorGender} />
+          <CommentPersonaBadges comment={comment} />
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <span className="text-xs text-[var(--ink-soft)]">
@@ -1832,11 +1952,7 @@ function MobilePostDetail({
       <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 focus-within:opacity-100">
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="text-sm font-extrabold">댓글 {post.comments.length}</h4>
-          {post.showCommenterGender ? (
-            <span className="text-[10px] font-bold text-[var(--ink-soft)]">
-              댓글에 성별 표시
-            </span>
-          ) : null}
+          <CommentPersonaRequestSummary post={post} />
         </div>
         <div className="mt-3 space-y-3">
           {post.comments.length > 0 ? (
@@ -1941,6 +2057,59 @@ function GenderBadge({ gender }: { gender?: CommentItem["authorGender"] }) {
       {gender}
     </span>
   );
+}
+
+function personaRequestsForPost(post: CommunityPost) {
+  if (post.commentPersonaRequests?.length) return post.commentPersonaRequests;
+  return post.showCommenterGender
+    ? ([{ type: "GENDER", level: "REQUESTED" }] satisfies CommentPersonaRequest[])
+    : [];
+}
+
+function CommentPersonaRequestSummary({ post }: { post: CommunityPost }) {
+  const requests = personaRequestsForPost(post);
+  if (requests.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {requests.map((request) => (
+        <span
+          key={request.type}
+          className="rounded-[4px] bg-[#f3f0ed] px-1.5 py-0.5 text-[10px] font-bold text-[var(--ink-soft)]"
+        >
+          {commentPersonaLabels[request.type]} {request.level === "REQUIRED" ? "필수" : "요청"}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CommentPersonaBadges({ comment }: { comment: CommentItem }) {
+  const personas =
+    comment.personas?.length
+      ? comment.personas
+      : comment.authorGender
+        ? [
+            {
+              type: "GENDER" as const,
+              label: "성별",
+              value: comment.authorGender,
+              verified: false,
+            },
+          ]
+        : [];
+  if (personas.length === 0) return null;
+
+  return personas.map((persona) => (
+    <span
+      key={persona.type}
+      title={`${persona.label}${persona.verified ? " · 인증됨" : ""}`}
+      className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-[4px] border border-[#ded4cc] bg-white px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#756c66]"
+    >
+      {persona.verified ? <Check className="size-2.5" aria-hidden="true" /> : null}
+      {persona.value}
+    </span>
+  ));
 }
 
 function PostActions({

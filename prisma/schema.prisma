@@ -227,6 +227,7 @@ model Post {
   isAnonymous        Boolean       @default(false)
   showAuthorGender   Boolean       @default(false)
   showCommenterGender Boolean       @default(true)
+  commentPersonaRequests Json       @default("[]")
   tags               String[]      @default([])
   /// Legacy compatibility for booboo2 URLs and migrated posts.
   /// TODO(legacy): Remove after 2027-06 if old /talk/post/:id traffic is no longer needed.
@@ -270,6 +271,7 @@ model Comment {
   isAnonymous     Boolean     @default(true)
   body            String
   tone            CommentTone @default(SUPPORT)
+  personaSnapshots Json        @default("[]")
   /// Legacy compatibility for migrated booboo2 comments.
   /// TODO(legacy): Remove after 2027-06 if old comment audit data is no longer needed.
   legacyId        Int?        @unique

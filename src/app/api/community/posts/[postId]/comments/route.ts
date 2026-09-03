@@ -5,6 +5,7 @@ import { createCommentSchema } from "@/lib/community-schema";
 import {
   CommentCooldownError,
   createCommunityComment,
+  PersonaSelectionRequiredError,
 } from "@/lib/community-service";
 
 const ANON_COOKIE = "booboo_anon_id";
@@ -37,6 +38,7 @@ export async function POST(
       isAnonymous: parsed.data.isAnonymous,
       userId: session?.user?.id,
       anonKey,
+      personaDisclosures: parsed.data.personaDisclosures,
     });
     const response = NextResponse.json(
       { comment, source: "database" },
@@ -57,6 +59,15 @@ export async function POST(
           status: 429,
           headers: { "Retry-After": String(error.retryAfterSeconds) },
         },
+      );
+    }
+    if (error instanceof PersonaSelectionRequiredError) {
+      return NextResponse.json(
+        {
+          error: "PERSONA_SELECTION_REQUIRED",
+          missingTypes: error.missingTypes,
+        },
+        { status: 409 },
       );
     }
     console.error("Failed to create community comment", error);

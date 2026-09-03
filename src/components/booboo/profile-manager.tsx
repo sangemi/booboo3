@@ -353,7 +353,7 @@ export function ProfileManager() {
                 <div>
                   <h2 className="text-lg font-bold">내 페르소나</h2>
                   <p className="mt-1 text-sm leading-6 text-[var(--ink-soft)]">
-                    직접 등록한 정보와 인증된 정보는 서로 다르게 표시됩니다.
+                    공개한 페르소나는 글과 댓글에서 나를 설명하는 정보로 표시됩니다.
                   </p>
                 </div>
                 <span className="shrink-0 text-xs text-[var(--ink-soft)]">
@@ -417,7 +417,7 @@ export function ProfileManager() {
                   ))
                 ) : (
                   <p className="px-4 py-8 text-center text-sm text-[var(--ink-soft)]">
-                    나를 설명하는 첫 페르소나를 추가해 보세요.
+                    결혼연도나 나이대처럼 댓글에 함께 보여줄 정보를 추가해 보세요.
                   </p>
                 )}
               </div>

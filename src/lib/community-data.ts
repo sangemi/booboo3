@@ -1,3 +1,8 @@
+import type {
+  CommentPersonaRequest,
+  CommentPersonaSnapshot,
+} from "@/lib/comment-persona";
+
 export type CategoryKey =
   | "all"
   | "talk"
@@ -36,12 +41,14 @@ export type CommunityPost = {
   pinned?: boolean;
   showAuthorGender?: boolean;
   showCommenterGender?: boolean;
+  commentPersonaRequests?: CommentPersonaRequest[];
 };
 
 export type CommentItem = {
   id: string;
   author: string;
   authorGender?: GenderLabel;
+  personas?: CommentPersonaSnapshot[];
   authorVerifiedPersonaCount?: number;
   body: string;
   tone: "support" | "advice" | "question";

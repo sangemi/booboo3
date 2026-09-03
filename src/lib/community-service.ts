@@ -4,6 +4,7 @@ import {
   LetterReactionType,
   LetterTone,
   PersonaType,
+  PersonaVerificationStatus,
   PostCategory,
   ReactionType,
   VerdictChoice,
@@ -25,13 +26,33 @@ import type {
   ReactionState,
   VerdictState,
 } from "@/lib/community-data";
+import {
+  commentPersonaLabels,
+  commentPersonaTypes,
+  normalizeCommentPersonaRequests,
+  normalizeCommentPersonaSnapshots,
+  type CommentPersonaDisclosure,
+  type CommentPersonaRequest,
+  type CommentPersonaSnapshot,
+  type CommentPersonaType,
+} from "@/lib/comment-persona";
 import { dailyMissionSelection, missions } from "@/lib/community-data";
 import { prisma } from "@/lib/db";
+import { formatMarriageYear, parseMarriageYear } from "@/lib/marriage-persona";
+import { normalizePersonaValue } from "@/lib/persona";
 
 type AuthorSummary = {
   name: string | null;
   nickname: string | null;
-  personas: Array<{ value: string; isPublic: boolean }>;
+  personas: Array<{
+    id: string;
+    type: PersonaType;
+    label: string;
+    value: string;
+    normalizedValue: string;
+    isPublic: boolean;
+    status: PersonaVerificationStatus;
+  }>;
   _count: { personas: number };
 } | null;
 
@@ -51,8 +72,15 @@ const authorSelect = {
   name: true,
   nickname: true,
   personas: {
-    where: { type: PersonaType.GENDER },
-    select: { value: true, isPublic: true },
+    select: {
+      id: true,
+      type: true,
+      label: true,
+      value: true,
+      normalizedValue: true,
+      isPublic: true,
+      status: true,
+    },
   },
   _count: {
     select: {
@@ -275,8 +303,13 @@ export async function createCommunityPost(input: {
   isAnonymous: boolean;
   showAuthorGender: boolean;
   showCommenterGender: boolean;
+  commentPersonaRequests: CommentPersonaRequest[];
 }) {
   const isAnonymous = !input.userId || input.isAnonymous;
+  const commentPersonaRequests = normalizeCommentPersonaRequests(
+    input.commentPersonaRequests,
+    input.showCommenterGender,
+  );
   const author = input.userId
     ? await prisma.user.findUnique({
         where: { id: input.userId },
@@ -300,7 +333,10 @@ export async function createCommunityPost(input: {
       tags: input.tags.length > 0 ? input.tags : ["새글"],
       isAnonymous,
       showAuthorGender: Boolean(input.userId && input.showAuthorGender),
-      showCommenterGender: input.showCommenterGender,
+      showCommenterGender: commentPersonaRequests.some(
+        (request) => request.type === "GENDER",
+      ),
+      commentPersonaRequests,
     },
     include: {
       author: { select: authorSelect },
@@ -325,6 +361,7 @@ export async function createCommunityComment(input: {
   userId?: string;
   anonKey?: string;
   isAnonymous: boolean;
+  personaDisclosures: CommentPersonaDisclosure[];
 }) {
   const cooldownStartedAt = new Date(Date.now() - 10_000);
   const recentComment = await prisma.comment.findFirst({
@@ -352,14 +389,30 @@ export async function createCommunityComment(input: {
     input.userId
       ? prisma.user.findUnique({
           where: { id: input.userId },
-          select: { name: true, nickname: true },
+          select: {
+            name: true,
+            nickname: true,
+            personas: { select: authorSelect.personas.select },
+          },
         })
       : null,
     prisma.post.findUnique({
       where: { id: input.postId },
-      select: { showCommenterGender: true },
+      select: {
+        showCommenterGender: true,
+        commentPersonaRequests: true,
+      },
     }),
   ]);
+  const personaRequests = normalizeCommentPersonaRequests(
+    post?.commentPersonaRequests,
+    post?.showCommenterGender ?? false,
+  );
+  const personaSnapshots = resolveCommentPersonaSnapshots(
+    personaRequests,
+    input.personaDisclosures,
+    author?.personas ?? [],
+  );
   const comment = await prisma.comment.create({
     data: {
       postId: input.postId,
@@ -371,6 +424,7 @@ export async function createCommunityComment(input: {
         ? "익명"
         : author?.nickname ?? author?.name ?? "부부라이프 회원",
       isAnonymous,
+      personaSnapshots,
     },
     include: {
       author: { select: authorSelect },
@@ -378,17 +432,18 @@ export async function createCommunityComment(input: {
     },
   });
 
-  return toCommunityComment(
-    comment,
-    input.userId,
-    input.anonKey,
-    post?.showCommenterGender ?? false,
-  );
+  return toCommunityComment(comment, input.userId, input.anonKey);
 }
 
 export class CommentCooldownError extends Error {
   constructor(readonly retryAfterSeconds: number) {
     super("COMMENT_COOLDOWN");
+  }
+}
+
+export class PersonaSelectionRequiredError extends Error {
+  constructor(readonly missingTypes: CommentPersonaType[]) {
+    super("PERSONA_SELECTION_REQUIRED");
   }
 }
 
@@ -413,12 +468,7 @@ export async function updateCommunityComment(input: {
     },
   });
 
-  return toCommunityComment(
-    comment,
-    input.userId,
-    input.anonKey,
-    existing.post.showCommenterGender,
-  );
+  return toCommunityComment(comment, input.userId, input.anonKey);
 }
 
 export async function deleteCommunityComment(input: {
@@ -846,12 +896,7 @@ function toCommunityPost(
     updatedAtIso: pageUpdatedAt.toISOString(),
     readMinutes: post.readMinutes,
     comments: post.comments.map((comment) =>
-      toCommunityComment(
-        comment,
-        currentUserId,
-        currentAnonKey,
-        post.showCommenterGender,
-      ),
+      toCommunityComment(comment, currentUserId, currentAnonKey),
     ),
     ...summarizePostReactions(post.reactions, currentUserId),
     verdicts: post.verdictVotes.reduce<VerdictState>(
@@ -866,6 +911,10 @@ function toCommunityPost(
     pinned: post.isPinned,
     showAuthorGender: post.showAuthorGender,
     showCommenterGender: post.showCommenterGender,
+    commentPersonaRequests: normalizeCommentPersonaRequests(
+      post.commentPersonaRequests,
+      post.showCommenterGender,
+    ),
   };
 }
 
@@ -910,16 +959,23 @@ function toCommunityComment(
   comment: CommentWithAuthor,
   currentUserId?: string,
   currentAnonKey?: string,
-  showGender = false,
 ) {
   const actorKey = commentActorKey(currentUserId, currentAnonKey);
+  const personas = mergeCommentPersonas(
+    normalizeCommentPersonaSnapshots(comment.personaSnapshots),
+    comment.author?.personas ?? [],
+  );
+  const gender = personas.find((persona) => persona.type === "GENDER")?.value;
+  const authorGender: GenderLabel | undefined =
+    gender === "남성" || gender === "여성" ? gender : undefined;
 
   return {
     id: comment.id,
     author: comment.isAnonymous
       ? "익명"
       : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
-    authorGender: showGender ? genderFromAuthor(comment.author) : undefined,
+    authorGender,
+    personas,
     authorVerifiedPersonaCount: comment.isAnonymous
       ? 0
       : comment.author?._count.personas ?? 0,
@@ -931,6 +987,110 @@ function toCommunityComment(
     canManage: isCommentOwner(comment, currentUserId, currentAnonKey),
     ...summarizeCommentReactions(comment.reactions, actorKey),
   };
+}
+
+function resolveCommentPersonaSnapshots(
+  requests: CommentPersonaRequest[],
+  disclosures: CommentPersonaDisclosure[],
+  personas: NonNullable<AuthorSummary>["personas"],
+) {
+  const missingTypes: CommentPersonaType[] = [];
+  const snapshots = requests.flatMap((request): CommentPersonaSnapshot[] => {
+    const disclosure = disclosures.find((item) => item.type === request.type);
+    if (disclosure?.skip) {
+      if (request.level === "REQUIRED") missingTypes.push(request.type);
+      return [];
+    }
+    const selectedPersona = disclosure?.personaId
+      ? personas.find(
+          (persona) =>
+            persona.id === disclosure.personaId && persona.type === request.type,
+        )
+      : personas.find(
+          (persona) => persona.type === request.type && persona.isPublic,
+        );
+
+    if (selectedPersona) return [snapshotFromPersona(selectedPersona)];
+
+    if (disclosure?.value) {
+      try {
+        const normalized = normalizePersonaValue(
+          request.type as PersonaType,
+          disclosure.value,
+        );
+        return [
+          {
+            type: request.type,
+            label: commentPersonaLabels[request.type],
+            value: displayPersonaValue(
+              request.type,
+              normalized.value,
+              normalized.normalizedValue,
+            ),
+            verified: false,
+          },
+        ];
+      } catch {
+        if (request.level === "REQUIRED") missingTypes.push(request.type);
+        return [];
+      }
+    }
+
+    if (request.level === "REQUIRED") missingTypes.push(request.type);
+    return [];
+  });
+
+  if (missingTypes.length > 0) {
+    throw new PersonaSelectionRequiredError(missingTypes);
+  }
+
+  return snapshots;
+}
+
+function mergeCommentPersonas(
+  snapshots: CommentPersonaSnapshot[],
+  personas: NonNullable<AuthorSummary>["personas"],
+) {
+  const merged = [...snapshots];
+
+  for (const persona of personas) {
+    if (
+      !persona.isPublic ||
+      !commentPersonaTypes.includes(persona.type as CommentPersonaType) ||
+      merged.some((item) => item.type === persona.type)
+    ) {
+      continue;
+    }
+    merged.push(snapshotFromPersona(persona));
+  }
+
+  return merged.sort(
+    (left, right) =>
+      commentPersonaTypes.indexOf(left.type) -
+      commentPersonaTypes.indexOf(right.type),
+  );
+}
+
+function snapshotFromPersona(
+  persona: NonNullable<AuthorSummary>["personas"][number],
+): CommentPersonaSnapshot {
+  const type = persona.type as CommentPersonaType;
+  return {
+    type,
+    label: commentPersonaLabels[type],
+    value: displayPersonaValue(type, persona.value, persona.normalizedValue),
+    verified: persona.status === PersonaVerificationStatus.VERIFIED,
+  };
+}
+
+function displayPersonaValue(
+  type: CommentPersonaType,
+  value: string,
+  normalizedValue: string,
+) {
+  if (type !== "MARRIAGE_YEARS") return value;
+  const marriageYear = parseMarriageYear(normalizedValue);
+  return marriageYear === null ? value : formatMarriageYear(marriageYear);
 }
 
 function genderFromAuthor(
