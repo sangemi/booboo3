@@ -38,8 +38,6 @@ export const commentPersonaLabels: Record<CommentPersonaType, string> = {
 
 export const defaultCommentPersonaRequests: CommentPersonaRequest[] = [
   { type: "GENDER", level: "REQUESTED" },
-  { type: "AGE_GROUP", level: "REQUESTED" },
-  { type: "MARRIAGE_YEARS", level: "REQUESTED" },
 ];
 
 export function isCommentPersonaType(

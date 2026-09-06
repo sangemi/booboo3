@@ -922,71 +922,71 @@ export function BoobooApp({
                 className="mt-3 min-h-32 w-full resize-y rounded-[8px] border border-[var(--line)] p-3 text-sm leading-6 outline-none focus:border-[var(--plum)]"
                 placeholder="상황, 마음, 원하는 피드백을 적어주세요."
               />
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-1 flex-wrap items-center gap-x-4 gap-y-2">
-                  {session?.user ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[var(--ink-soft)]">
-                        글쓴이
-                      </span>
-                      <div className="flex rounded-[8px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
-                        <button
-                          type="button"
-                          onClick={() => setPostAsMe(false)}
-                          className={cn(
-                            "h-8 rounded-[6px] px-3 text-xs",
-                            !postAsMe
-                              ? "bg-white font-bold text-[var(--plum)] shadow-sm"
-                              : "text-[var(--ink-soft)]",
-                          )}
-                        >
-                          익명
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPostAsMe(true)}
-                          className={cn(
-                            "h-8 rounded-[6px] px-3 text-xs",
-                            postAsMe
-                              ? "bg-white font-bold text-[var(--plum)] shadow-sm"
-                              : "text-[var(--ink-soft)]",
-                          )}
-                        >
-                          내 이름
-                        </button>
-                      </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                {session?.user ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-[var(--ink-soft)]">
+                      글쓴이
+                    </span>
+                    <div className="flex rounded-[8px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setPostAsMe(false)}
+                        className={cn(
+                          "h-8 rounded-[6px] px-3 text-xs",
+                          !postAsMe
+                            ? "bg-white font-bold text-[var(--plum)] shadow-sm"
+                            : "text-[var(--ink-soft)]",
+                        )}
+                      >
+                        익명
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPostAsMe(true)}
+                        className={cn(
+                          "h-8 rounded-[6px] px-3 text-xs",
+                          postAsMe
+                            ? "bg-white font-bold text-[var(--plum)] shadow-sm"
+                            : "text-[var(--ink-soft)]",
+                        )}
+                      >
+                        내 이름
+                      </button>
                     </div>
-                  ) : (
-                    <p className="text-xs text-[var(--ink-soft)]">
-                      익명으로 올라갑니다.
-                    </p>
-                  )}
-                  <CommentPersonaRequestEditor
-                    value={newPost.commentPersonaRequests}
-                    onChange={(commentPersonaRequests) =>
-                      setNewPost((current) => ({
-                        ...current,
-                        commentPersonaRequests,
-                      }))
-                    }
-                  />
-                  {session?.user ? (
-                    <label className="mt-3 inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-[var(--ink-soft)] opacity-70">
-                      <input
-                        type="checkbox"
-                        checked={newPost.showAuthorGender}
-                        onChange={(event) =>
-                          setNewPost((current) => ({
-                            ...current,
-                            showAuthorGender: event.target.checked,
-                          }))
-                        }
-                        className="size-3.5 accent-[var(--plum)]"
-                      />
-                      글쓴이 성별 표시
-                    </label>
-                  ) : null}
-                </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    익명으로 올라갑니다.
+                  </p>
+                )}
+                {session?.user ? (
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-[var(--ink-soft)] opacity-70">
+                    <input
+                      type="checkbox"
+                      checked={newPost.showAuthorGender}
+                      onChange={(event) =>
+                        setNewPost((current) => ({
+                          ...current,
+                          showAuthorGender: event.target.checked,
+                        }))
+                      }
+                      className="size-3.5 accent-[var(--plum)]"
+                    />
+                    글쓴이 성별 표시
+                  </label>
+                ) : null}
+              </div>
+              <CommentPersonaRequestEditor
+                value={newPost.commentPersonaRequests}
+                onChange={(commentPersonaRequests) =>
+                  setNewPost((current) => ({
+                    ...current,
+                    commentPersonaRequests,
+                  }))
+                }
+              />
+              <div className="mt-3 flex justify-end">
                 <button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white">
                   <Send className="size-4" />
                   올리기

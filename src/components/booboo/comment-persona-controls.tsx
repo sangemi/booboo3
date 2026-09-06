@@ -1,7 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Plus, X } from "lucide-react";
+import { useMemo, useState, type DragEvent } from "react";
 
 import {
   commentPersonaLabels,
@@ -29,6 +29,11 @@ export type ProfilePersonaOption = {
 
 type RequestMode = "NONE" | CommentPersonaRequestLevel;
 
+const requestGroups = [
+  { level: "REQUIRED" as const, label: "필수" },
+  { level: "REQUESTED" as const, label: "선택" },
+];
+
 export function CommentPersonaRequestEditor({
   value,
   onChange,
@@ -48,61 +53,123 @@ export function CommentPersonaRequestEditor({
     );
   }
 
+  function handleDragStart(
+    event: DragEvent<HTMLElement>,
+    type: CommentPersonaType,
+  ) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", type);
+  }
+
+  function handleDrop(event: DragEvent<HTMLElement>, mode: RequestMode) {
+    event.preventDefault();
+    const type = event.dataTransfer.getData("text/plain");
+    if (!commentPersonaTypes.includes(type as CommentPersonaType)) return;
+    setMode(type as CommentPersonaType, mode);
+  }
+
+  const unusedTypes = commentPersonaTypes.filter(
+    (type) => !value.some((request) => request.type === type),
+  );
+
   return (
-    <section className="mt-4 border-t border-[var(--line)] pt-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h3 className="text-xs font-bold text-[var(--foreground)]">
-            댓글에서 받고 싶은 정보
-          </h3>
-          <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">
-            요청은 건너뛸 수 있고, 필수는 댓글을 등록할 때 바로 선택합니다.
-          </p>
-        </div>
-        <span className="text-[11px] text-[var(--ink-soft)]">
-          여러 항목 선택 가능
-        </span>
-      </div>
-      <div className="mt-3 divide-y divide-[var(--line)] border-y border-[var(--line)]">
-        {commentPersonaTypes.map((type) => {
-          const mode =
-            value.find((request) => request.type === type)?.level ?? "NONE";
+    <section className="mt-3 border-t border-[var(--line)] pt-3">
+      <h3 className="text-xs font-bold text-[var(--foreground)]">
+        댓글에서 받고 싶은 정보
+      </h3>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {requestGroups.map((group) => {
+          const items = value.filter(
+            (request) => request.level === group.level,
+          );
+          const isRequired = group.level === "REQUIRED";
+
           return (
             <div
-              key={type}
-              className="flex min-h-11 flex-wrap items-center justify-between gap-2 py-2"
+              key={group.level}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => handleDrop(event, group.level)}
+              className="min-h-14 rounded-[8px] border border-[var(--line)] bg-[#faf7f4] px-3 py-2"
             >
-              <span className="text-xs font-bold text-[var(--ink-soft)]">
-                {commentPersonaLabels[type]}
-              </span>
-              <div className="grid grid-cols-3 rounded-[7px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
-                {(
-                  [
-                    ["NONE", "안 받음"],
-                    ["REQUESTED", "요청"],
-                    ["REQUIRED", "필수"],
-                  ] as const
-                ).map(([option, label]) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={mode === option}
-                    onClick={() => setMode(type, option)}
-                    className={cn(
-                      "h-7 rounded-[5px] px-2 text-[11px]",
-                      mode === option
-                        ? "bg-white font-bold text-[var(--plum)] shadow-sm"
-                        : "text-[var(--ink-soft)]",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                <span className="w-9 shrink-0 text-[11px] font-bold text-[var(--ink-soft)]">
+                  {group.label}
+                </span>
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                  {items.length === 0 ? (
+                    <span className="py-1 text-xs text-[var(--ink-soft)] opacity-70">
+                      없음
+                    </span>
+                  ) : (
+                    items.map((request) => (
+                      <span
+                        key={request.type}
+                        draggable
+                        onDragStart={(event) =>
+                          handleDragStart(event, request.type)
+                        }
+                        className="inline-flex h-7 items-center rounded-[6px] border border-[#e4d8cf] bg-white text-xs font-bold text-[var(--foreground)] shadow-sm"
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMode(
+                              request.type,
+                              isRequired ? "REQUESTED" : "REQUIRED",
+                            )
+                          }
+                          title={isRequired ? "선택으로 옮기기" : "필수로 옮기기"}
+                          aria-label={`${commentPersonaLabels[request.type]} ${
+                            isRequired ? "선택으로 옮기기" : "필수로 옮기기"
+                          }`}
+                          className="inline-flex h-full items-center gap-1 rounded-l-[5px] px-2 hover:bg-[#fbf6f0] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
+                        >
+                          {isRequired ? (
+                            <ArrowRight className="size-3" aria-hidden="true" />
+                          ) : (
+                            <ArrowLeft className="size-3" aria-hidden="true" />
+                          )}
+                          {commentPersonaLabels[request.type]}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMode(request.type, "NONE")}
+                          title={`${commentPersonaLabels[request.type]} 빼기`}
+                          aria-label={`${commentPersonaLabels[request.type]} 빼기`}
+                          className="inline-flex size-7 items-center justify-center rounded-r-[5px] text-[var(--ink-soft)] hover:bg-[#fbf6f0] hover:text-[var(--plum)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
+                        >
+                          <X className="size-3" aria-hidden="true" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+      {unusedTypes.length > 0 ? (
+        <div
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => handleDrop(event, "NONE")}
+          className="mt-2 flex flex-wrap gap-1.5"
+        >
+          {unusedTypes.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setMode(type, "REQUIRED")}
+              title={`${commentPersonaLabels[type]} 필수로 추가`}
+              aria-label={`${commentPersonaLabels[type]} 필수로 추가`}
+              className="inline-flex h-7 items-center gap-1 rounded-[6px] border border-dashed border-[#d9ccc2] px-2 text-xs text-[var(--ink-soft)] hover:border-[var(--plum)] hover:text-[var(--plum)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
+            >
+              <Plus className="size-3" aria-hidden="true" />
+              {commentPersonaLabels[type]}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
