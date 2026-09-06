@@ -32,7 +32,7 @@ export const commentPersonaLabels: Record<CommentPersonaType, string> = {
   GENDER: "성별",
   AGE_GROUP: "나이대",
   MARRIAGE_YEARS: "결혼연도",
-  PARENTING: "부모 경험",
+  PARENTING: "자녀 유무",
   PROFESSION: "직업",
 };
 

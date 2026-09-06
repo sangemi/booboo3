@@ -2111,7 +2111,7 @@ function CommentPersonaRequestSummary({ post }: { post: CommunityPost }) {
           key={request.type}
           className="rounded-[4px] bg-[#f3f0ed] px-1.5 py-0.5 text-[10px] font-bold text-[var(--ink-soft)]"
         >
-          {commentPersonaLabels[request.type]} {request.level === "REQUIRED" ? "필수" : "요청"}
+          {commentPersonaLabels[request.type]} {request.level === "REQUIRED" ? "필수" : "선택"}
         </span>
       ))}
     </div>

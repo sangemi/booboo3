@@ -64,7 +64,7 @@ const personaOptions: Array<{ value: PersonaType; label: string }> = [
   { value: "GENDER", label: "성별" },
   { value: "AGE_GROUP", label: "나이대" },
   { value: "PROFESSION", label: "직업" },
-  { value: "PARENTING", label: "부모 경험" },
+  { value: "PARENTING", label: "자녀 유무" },
 ];
 
 const statusLabels: Record<Persona["status"], string> = {
@@ -420,6 +420,8 @@ export function ProfileManager() {
                           <span className="text-xs font-bold text-[var(--ink-soft)]">
                             {persona.type === "MARRIAGE_YEARS"
                               ? "결혼연도"
+                              : persona.type === "PARENTING"
+                                ? "자녀 유무"
                               : persona.label}
                           </span>
                           <span
@@ -575,9 +577,9 @@ function personaValueInput(
 
   if (type === "PARENTING") {
     return (
-      <select value={value} onChange={(event) => setValue(event.target.value)} className={className} aria-label="부모 경험">
+      <select value={value} onChange={(event) => setValue(event.target.value)} className={className} aria-label="자녀 유무">
         <option value="">선택</option>
-        {["아이를 기다리는 중", "영유아 부모", "초등학생 부모", "중고등학생 부모", "성인 자녀 부모"].map((option) => (
+        {["자녀 없음", "자녀 있음", "자녀를 기다리는 중"].map((option) => (
           <option key={option}>{option}</option>
         ))}
       </select>

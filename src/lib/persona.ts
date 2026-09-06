@@ -17,7 +17,7 @@ export const personaLabels: Record<PersonaType, string> = {
   [PersonaType.EMPLOYER]: "직장",
   [PersonaType.PROFESSION]: "직업",
   [PersonaType.MARRIAGE_YEARS]: "결혼연도",
-  [PersonaType.PARENTING]: "부모 경험",
+  [PersonaType.PARENTING]: "자녀 유무",
   [PersonaType.OTHER]: "나를 설명하는 말",
 };
 

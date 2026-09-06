@@ -30,8 +30,8 @@ export type ProfilePersonaOption = {
 type RequestMode = "NONE" | CommentPersonaRequestLevel;
 
 const requestGroups = [
-  { level: "REQUIRED" as const, label: "필수" },
   { level: "REQUESTED" as const, label: "선택" },
+  { level: "REQUIRED" as const, label: "필수" },
 ];
 
 export function CommentPersonaRequestEditor({
@@ -125,9 +125,9 @@ export function CommentPersonaRequestEditor({
                           className="inline-flex h-full items-center gap-1 rounded-l-[5px] px-2 hover:bg-[#fbf6f0] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
                         >
                           {isRequired ? (
-                            <ArrowRight className="size-3" aria-hidden="true" />
-                          ) : (
                             <ArrowLeft className="size-3" aria-hidden="true" />
+                          ) : (
+                            <ArrowRight className="size-3" aria-hidden="true" />
                           )}
                           {commentPersonaLabels[request.type]}
                         </button>
@@ -159,9 +159,9 @@ export function CommentPersonaRequestEditor({
             <button
               key={type}
               type="button"
-              onClick={() => setMode(type, "REQUIRED")}
-              title={`${commentPersonaLabels[type]} 필수로 추가`}
-              aria-label={`${commentPersonaLabels[type]} 필수로 추가`}
+              onClick={() => setMode(type, "REQUESTED")}
+              title={`${commentPersonaLabels[type]} 선택에 추가`}
+              aria-label={`${commentPersonaLabels[type]} 선택에 추가`}
               className="inline-flex h-7 items-center gap-1 rounded-[6px] border border-dashed border-[#d9ccc2] px-2 text-xs text-[var(--ink-soft)] hover:border-[var(--plum)] hover:text-[var(--plum)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
             >
               <Plus className="size-3" aria-hidden="true" />
@@ -223,7 +223,7 @@ export function CommentPersonaDialog({
         const choice = choices[request.type] ?? "";
         if (!choice) {
           if (request.level === "REQUIRED") {
-            throw new Error(`${commentPersonaLabels[request.type]}을 선택해 주세요.`);
+            throw new Error(`${commentPersonaLabels[request.type]} 정보를 선택해 주세요.`);
           }
           disclosures.push({ type: request.type, skip: true });
           continue;
@@ -237,7 +237,7 @@ export function CommentPersonaDialog({
         const value = values[request.type]?.trim();
         if (!value) {
           if (request.level === "REQUIRED") {
-            throw new Error(`${commentPersonaLabels[request.type]}을 입력해 주세요.`);
+            throw new Error(`${commentPersonaLabels[request.type]} 정보를 입력해 주세요.`);
           }
           disclosures.push({ type: request.type, skip: true });
           continue;
@@ -308,7 +308,7 @@ export function CommentPersonaDialog({
               댓글에 표시할 페르소나
             </h2>
             <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">
-              필수 항목은 선택해야 하며, 요청 항목은 건너뛸 수 있습니다.
+              필수 항목은 선택해야 하며, 선택 항목은 건너뛸 수 있습니다.
             </p>
           </div>
           <button
@@ -346,7 +346,7 @@ export function CommentPersonaDialog({
                         : "bg-[#f3f0ed] text-[var(--ink-soft)]",
                     )}
                   >
-                    {request.level === "REQUIRED" ? "필수" : "요청"}
+                    {request.level === "REQUIRED" ? "필수" : "선택"}
                   </span>
                 </div>
                 <select
@@ -453,7 +453,7 @@ function PersonaValueField({
     return (
       <select value={value} onChange={(event) => onChange(event.target.value)} className={className}>
         <option value="">선택</option>
-        {["아이를 기다리는 중", "영유아 부모", "초등학생 부모", "중고등학생 부모", "성인 자녀 부모"].map((option) => (
+        {["자녀 없음", "자녀 있음", "자녀를 기다리는 중"].map((option) => (
           <option key={option}>{option}</option>
         ))}
       </select>
