@@ -57,10 +57,14 @@ const verdictOptions: Array<{
   label: string;
   description: string;
 }> = [
-  { key: "husband", label: "남편 쪽", description: "남편의 책임이 더 커요" },
-  { key: "wife", label: "아내 쪽", description: "아내의 책임이 더 커요" },
-  { key: "both", label: "둘 다", description: "둘 다 돌아볼 부분이 있어요" },
-  { key: "notEnough", label: "정보 부족", description: "이야기가 더 필요해요" },
+  { key: "husband", label: "남편 의견", description: "남편의 생각에 더 공감해요" },
+  { key: "wife", label: "아내 의견", description: "아내의 생각에 더 공감해요" },
+  { key: "both", label: "두 사람 모두", description: "두 사람의 생각 모두 이해돼요" },
+  {
+    key: "notEnough",
+    label: "조금 더 듣고 싶어요",
+    description: "판단하려면 이야기가 더 필요해요",
+  },
 ];
 
 type BoobooAppProps = {
@@ -1600,7 +1604,9 @@ function VerdictPanel({
   return (
     <section className="mt-5 rounded-[8px] border border-[var(--line)] bg-[#fbf6f0] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-extrabold">누가 더 잘못했나요?</h4>
+        <h4 className="text-sm font-extrabold">
+          어느 쪽 의견에 더 공감하나요?
+        </h4>
         <span className="text-xs font-bold text-[var(--ink-soft)]">
           계정당 한 표 · 총 {total}표
         </span>

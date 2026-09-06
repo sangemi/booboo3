@@ -114,7 +114,7 @@ export const categories: Array<{
   {
     key: "verdict",
     label: "남편 vs 아내",
-    description: "누가 더 잘못했는지 함께 판단하는 이야기",
+    description: "서로 다른 관점을 함께 살펴보는 이야기",
   },
   { key: "tips", label: "생활팁", description: "싸움을 줄이는 작은 방법" },
   // 보류: 한 게시판이 제대로 활성화되면 다시 열 후보입니다.

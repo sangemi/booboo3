@@ -32,7 +32,7 @@ export default function CommunityPolicyPage() {
       <LegalSection title="1. 운영 원칙">
         <LegalBullets>
           <li><strong>잘 사는 부부에게서 배우기:</strong> 평범한 일상, 고마움과 회복의 경험도 갈등 이야기만큼 존중합니다.</li>
-          <li><strong>부부싸움에서도 배우기:</strong> “누가 더 잘못했나요?”의 목적은 망신주기가 아니라 다음 선택을 돌아보는 데 있습니다.</li>
+          <li><strong>부부싸움에서도 배우기:</strong> 남편과 아내의 의견을 함께 살피고, 사람을 탓하기보다 다음 선택을 돌아봅니다.</li>
           <li><strong>따뜻한 댓글 남기기:</strong> 비판할 때도 사람 전체를 단정하지 않고, 게시물에 드러난 행동과 상황을 중심으로 말합니다.</li>
           <li><strong>치우치지 않기:</strong> 성별, 직업, 소득, 가족 형태만으로 잘잘못이나 신뢰도를 정하지 않습니다.</li>
         </LegalBullets>
