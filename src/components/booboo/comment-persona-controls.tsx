@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, LoaderCircle, Plus, X } from "lucide-react";
 import { useMemo, useState, type DragEvent } from "react";
 
 import {
@@ -26,6 +26,173 @@ export type ProfilePersonaOption = {
   isPublic: boolean;
   status: "DECLARED" | "PENDING" | "VERIFIED" | "REJECTED";
 };
+
+export function AuthorPersonaPicker({
+  personas,
+  selectedIds,
+  loading,
+  onChange,
+  onPersonaCreated,
+}: {
+  personas: ProfilePersonaOption[];
+  selectedIds: string[];
+  loading: boolean;
+  onChange: (ids: string[]) => void;
+  onPersonaCreated: (persona: ProfilePersonaOption) => void;
+}) {
+  const availablePersonas = personas.filter((persona) =>
+    commentPersonaTypes.includes(persona.type),
+  );
+  const missingTypes = commentPersonaTypes.filter(
+    (type) => !availablePersonas.some((persona) => persona.type === type),
+  );
+  const [adding, setAdding] = useState(false);
+  const [newType, setNewType] = useState<CommentPersonaType>(
+    missingTypes[0] ?? "GENDER",
+  );
+  const [newValue, setNewValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function togglePersona(persona: ProfilePersonaOption) {
+    if (selectedIds.includes(persona.id)) {
+      onChange(selectedIds.filter((id) => id !== persona.id));
+      return;
+    }
+
+    const idsWithoutSameType = selectedIds.filter(
+      (id) => personas.find((item) => item.id === id)?.type !== persona.type,
+    );
+    onChange([...idsWithoutSameType, persona.id]);
+  }
+
+  async function addPersona() {
+    if (!newValue.trim() || saving) return;
+    setSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/profile/personas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: newType,
+          value: newValue,
+          isPublic: false,
+        }),
+      });
+      const payload = (await response.json()) as ProfilePersonaOption & {
+        error?: string;
+      };
+      if (!response.ok || !payload.id) {
+        throw new Error(payload.error ?? "정보를 저장하지 못했습니다.");
+      }
+
+      onPersonaCreated(payload);
+      const idsWithoutSameType = selectedIds.filter(
+        (id) => personas.find((item) => item.id === id)?.type !== payload.type,
+      );
+      onChange([...idsWithoutSameType, payload.id]);
+      setNewValue("");
+      setAdding(false);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "정보를 저장하지 못했습니다.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="mt-2 border-t border-[var(--line)] pt-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <h3 className="mr-1 text-[11px] font-bold text-[var(--foreground)]">
+          글에 표시할 내 정보
+        </h3>
+        {loading ? (
+          <span className="text-[11px] text-[var(--ink-soft)]">불러오는 중</span>
+        ) : (
+          availablePersonas.map((persona) => {
+            const selected = selectedIds.includes(persona.id);
+            return (
+              <button
+                key={persona.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => togglePersona(persona)}
+                className={cn(
+                  "inline-flex h-6 items-center gap-1 rounded-[6px] border px-2 text-[11px] transition",
+                  selected
+                    ? "border-[var(--plum)] bg-[#f4e8ee] font-bold text-[var(--plum)]"
+                    : "border-[#ddd4cd] bg-white text-[var(--ink-soft)] hover:border-[var(--plum)]",
+                )}
+              >
+                {selected ? <Check className="size-3" aria-hidden="true" /> : null}
+                {displayProfilePersona(persona)}
+              </button>
+            );
+          })
+        )}
+        {!loading && missingTypes.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              setNewType(missingTypes[0]);
+              setAdding((current) => !current);
+              setError("");
+            }}
+            aria-expanded={adding}
+            className="inline-flex h-6 items-center gap-1 rounded-[6px] border border-dashed border-[#d9ccc2] px-2 text-[11px] text-[var(--ink-soft)] hover:border-[var(--plum)] hover:text-[var(--plum)]"
+          >
+            <Plus className="size-3" aria-hidden="true" />
+            내 정보 추가
+          </button>
+        ) : null}
+      </div>
+
+      {adding ? (
+        <div className="mt-2 grid gap-1.5 sm:grid-cols-[120px_minmax(0,1fr)_auto]">
+          <select
+            value={newType}
+            onChange={(event) => {
+              setNewType(event.target.value as CommentPersonaType);
+              setNewValue("");
+              setError("");
+            }}
+            aria-label="추가할 내 정보"
+            className="h-9 rounded-[7px] border border-[var(--line)] bg-white px-2 text-xs outline-none focus:border-[var(--plum)]"
+          >
+            {missingTypes.map((type) => (
+              <option key={type} value={type}>
+                {commentPersonaLabels[type]}
+              </option>
+            ))}
+          </select>
+          <PersonaValueField type={newType} value={newValue} onChange={setNewValue} compact />
+          <button
+            type="button"
+            onClick={addPersona}
+            disabled={!newValue.trim() || saving}
+            className="inline-flex h-9 items-center justify-center gap-1 rounded-[7px] bg-[var(--plum)] px-3 text-xs font-bold text-white disabled:opacity-40"
+          >
+            {saving ? (
+              <LoaderCircle className="size-3 animate-spin" aria-hidden="true" />
+            ) : (
+              <Check className="size-3" aria-hidden="true" />
+            )}
+            추가
+          </button>
+        </div>
+      ) : null}
+      {error ? (
+        <p role="alert" className="mt-1.5 text-[11px] text-[var(--coral)]">
+          {error}
+        </p>
+      ) : null}
+    </section>
+  );
+}
 
 type RequestMode = "NONE" | CommentPersonaRequestLevel;
 
@@ -73,11 +240,11 @@ export function CommentPersonaRequestEditor({
   );
 
   return (
-    <section className="mt-3 border-t border-[var(--line)] pt-3">
-      <h3 className="text-xs font-bold text-[var(--foreground)]">
+    <section className="mt-2 border-t border-[var(--line)] pt-2">
+      <h3 className="text-[11px] font-bold text-[var(--foreground)]">
         댓글에서 받고 싶은 정보
       </h3>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
         {requestGroups.map((group) => {
           const items = value.filter(
             (request) => request.level === group.level,
@@ -89,15 +256,15 @@ export function CommentPersonaRequestEditor({
               key={group.level}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => handleDrop(event, group.level)}
-              className="min-h-14 rounded-[8px] border border-[var(--line)] bg-[#faf7f4] px-3 py-2"
+              className="min-h-11 rounded-[7px] border border-[var(--line)] bg-[#faf7f4] px-2.5 py-1.5"
             >
               <div className="flex items-center gap-2">
-                <span className="w-9 shrink-0 text-[11px] font-bold text-[var(--ink-soft)]">
+                <span className="w-8 shrink-0 text-[10px] font-bold text-[var(--ink-soft)]">
                   {group.label}
                 </span>
                 <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
                   {items.length === 0 ? (
-                    <span className="py-1 text-xs text-[var(--ink-soft)] opacity-70">
+                    <span className="py-1 text-[11px] text-[var(--ink-soft)] opacity-70">
                       없음
                     </span>
                   ) : (
@@ -108,7 +275,7 @@ export function CommentPersonaRequestEditor({
                         onDragStart={(event) =>
                           handleDragStart(event, request.type)
                         }
-                        className="inline-flex h-7 items-center rounded-[6px] border border-[#e4d8cf] bg-white text-xs font-bold text-[var(--foreground)] shadow-sm"
+                        className="inline-flex h-6 items-center rounded-[6px] border border-[#e4d8cf] bg-white text-[11px] font-bold text-[var(--foreground)] shadow-sm"
                       >
                         <button
                           type="button"
@@ -136,7 +303,7 @@ export function CommentPersonaRequestEditor({
                           onClick={() => setMode(request.type, "NONE")}
                           title={`${commentPersonaLabels[request.type]} 빼기`}
                           aria-label={`${commentPersonaLabels[request.type]} 빼기`}
-                          className="inline-flex size-7 items-center justify-center rounded-r-[5px] text-[var(--ink-soft)] hover:bg-[#fbf6f0] hover:text-[var(--plum)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
+                          className="inline-flex size-6 items-center justify-center rounded-r-[5px] text-[var(--ink-soft)] hover:bg-[#fbf6f0] hover:text-[var(--plum)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
                         >
                           <X className="size-3" aria-hidden="true" />
                         </button>
@@ -153,7 +320,7 @@ export function CommentPersonaRequestEditor({
         <div
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => handleDrop(event, "NONE")}
-          className="mt-2 flex flex-wrap gap-1.5"
+          className="mt-1.5 flex flex-wrap gap-1"
         >
           {unusedTypes.map((type) => (
             <button
@@ -162,7 +329,7 @@ export function CommentPersonaRequestEditor({
               onClick={() => setMode(type, "REQUESTED")}
               title={`${commentPersonaLabels[type]} 선택에 추가`}
               aria-label={`${commentPersonaLabels[type]} 선택에 추가`}
-              className="inline-flex h-7 items-center gap-1 rounded-[6px] border border-dashed border-[#d9ccc2] px-2 text-xs text-[var(--ink-soft)] hover:border-[var(--plum)] hover:text-[var(--plum)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
+              className="inline-flex h-6 items-center gap-1 rounded-[6px] border border-dashed border-[#d9ccc2] px-2 text-[11px] text-[var(--ink-soft)] hover:border-[var(--plum)] hover:text-[var(--plum)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--plum)]"
             >
               <Plus className="size-3" aria-hidden="true" />
               {commentPersonaLabels[type]}
@@ -420,13 +587,15 @@ function PersonaValueField({
   type,
   value,
   onChange,
+  compact = false,
 }: {
   type: CommentPersonaType;
   value: string;
   onChange: (value: string) => void;
+  compact?: boolean;
 }) {
   const className =
-    "h-10 w-full rounded-[8px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--plum)]";
+    `${compact ? "h-9 rounded-[7px] px-2 text-xs" : "h-10 rounded-[8px] px-3 text-sm"} w-full border border-[var(--line)] bg-white outline-none focus:border-[var(--plum)]`;
 
   if (type === "GENDER") {
     return (

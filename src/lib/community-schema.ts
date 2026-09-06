@@ -26,6 +26,14 @@ export const createPostSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(20)).max(6).default([]),
   isAnonymous: z.boolean().default(true),
   showAuthorGender: z.boolean().default(false),
+  authorPersonaIds: z
+    .array(z.string().trim().min(1))
+    .max(commentPersonaTypes.length)
+    .default([])
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      "같은 페르소나는 한 번만 공개할 수 있습니다.",
+    ),
   showCommenterGender: z.boolean().default(true),
   commentPersonaRequests: z
     .array(commentPersonaRequestSchema)

@@ -24,6 +24,7 @@ export type CommunityPost = {
   body: string;
   author: string;
   authorGender?: GenderLabel;
+  authorPersonas?: CommentPersonaSnapshot[];
   authorVerifiedPersonaCount?: number;
   coupleStage: string;
   mood: MoodKey;

@@ -25,6 +25,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { VerifiedName } from "@/components/booboo/verified-name";
 import {
+  AuthorPersonaPicker,
   CommentPersonaDialog,
   CommentPersonaRequestEditor,
   type ProfilePersonaOption,
@@ -68,6 +69,11 @@ const verdictOptions: Array<{
   },
 ];
 
+const goalMessages = [
+  "더 다정하게 살고, 더 건강하게 다투기",
+  "다른 보통 부부는 어떻게 살아갈까요?",
+] as const;
+
 type BoobooAppProps = {
   initialPost?: CommunityPost;
   initialPosts?: CommunityPost[];
@@ -97,6 +103,7 @@ export function BoobooApp({
   const [activeCategory, setActiveCategory] = useState<CategoryKey>(
     initialCategory ?? "all",
   );
+  const [goalMessageIndex, setGoalMessageIndex] = useState(0);
   const [query, setQuery] = useState("");
   const [todayMission, setTodayMission] = useState<Mission>(
     () => initialMission ?? dailyMissionSelection().mission,
@@ -119,7 +126,7 @@ export function BoobooApp({
     title: "",
     body: "",
     category: "talk" as Exclude<CategoryKey, "all">,
-    showAuthorGender: false,
+    authorPersonaIds: [] as string[],
     commentPersonaRequests: [...defaultCommentPersonaRequests],
   });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
@@ -141,6 +148,13 @@ export function BoobooApp({
     requests: CommentPersonaRequest[];
     personas: ProfilePersonaOption[];
   } | null>(null);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setGoalMessageIndex(Math.floor(Math.random() * goalMessages.length));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -317,6 +331,30 @@ export function BoobooApp({
     };
   }, [commentPersonaDialog]);
 
+  useEffect(() => {
+    if (!composerOpen || !session?.user || profilePersonas !== null) return;
+
+    let active = true;
+    void fetch("/api/profile", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return [];
+        const payload = (await response.json()) as {
+          personas?: ProfilePersonaOption[];
+        };
+        return payload.personas ?? [];
+      })
+      .then((personas) => {
+        if (active) setProfilePersonas(personas);
+      })
+      .catch(() => {
+        if (active) setProfilePersonas([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [composerOpen, profilePersonas, session?.user]);
+
   function selectPost(post: CommunityPost) {
     setSelectedPostId(post.id);
     setMobileDetailOpen(true);
@@ -413,7 +451,12 @@ export function BoobooApp({
           body: newPost.body,
           tags: ["새글"],
           isAnonymous: !postAsMe,
-          showAuthorGender: newPost.showAuthorGender,
+          showAuthorGender: newPost.authorPersonaIds.some((id) =>
+            profilePersonas?.some(
+              (persona) => persona.id === id && persona.type === "GENDER",
+            ),
+          ),
+          authorPersonaIds: newPost.authorPersonaIds,
           showCommenterGender: newPost.commentPersonaRequests.some(
             (request) => request.type === "GENDER",
           ),
@@ -444,7 +487,7 @@ export function BoobooApp({
       title: "",
       body: "",
       category: "talk",
-      showAuthorGender: false,
+      authorPersonaIds: [],
       commentPersonaRequests: [...defaultCommentPersonaRequests],
     });
     setPostAsMe(false);
@@ -848,10 +891,7 @@ export function BoobooApp({
                 목표
               </span>
               {" "}
-              <span>
-                행복한 부부는 더 배우고 나누고, 다투는 부부는 건강하게 싸우는
-                연습을
-              </span>
+              <span>{goalMessages[goalMessageIndex]}</span>
             </GoalHeading>
           </div>
 
@@ -942,19 +982,20 @@ export function BoobooApp({
                 className="mt-3 min-h-32 w-full resize-y rounded-[8px] border border-[var(--line)] p-3 text-sm leading-6 outline-none focus:border-[var(--plum)]"
                 placeholder="상황, 마음, 원하는 피드백을 적어주세요."
               />
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                {session?.user ? (
+              <div className="mt-2 border-t border-[var(--line)] pt-2 opacity-60 transition-opacity duration-150 hover:opacity-85 focus-within:opacity-100">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-[var(--ink-soft)]">
+                    <span className="text-[11px] font-bold text-[var(--ink-soft)]">
                       글쓴이
                     </span>
-                    <div className="flex rounded-[8px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
+                    <div className="flex rounded-[7px] border border-[var(--line)] bg-[#faf7f4] p-0.5">
                       <button
                         type="button"
+                        aria-pressed={!postAsMe || !session?.user}
                         onClick={() => setPostAsMe(false)}
                         className={cn(
-                          "h-8 rounded-[6px] px-3 text-xs",
-                          !postAsMe
+                          "h-7 rounded-[5px] px-2.5 text-[11px]",
+                          !postAsMe || !session?.user
                             ? "bg-white font-bold text-[var(--plum)] shadow-sm"
                             : "text-[var(--ink-soft)]",
                         )}
@@ -963,10 +1004,27 @@ export function BoobooApp({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPostAsMe(true)}
+                        aria-pressed={Boolean(session?.user && postAsMe)}
+                        disabled={sessionStatus === "loading"}
+                        title={
+                          session?.user
+                            ? undefined
+                            : "로그인 후 내 이름으로 올릴 수 있습니다."
+                        }
+                        onClick={() => {
+                          if (session?.user) {
+                            setPostAsMe(true);
+                            return;
+                          }
+
+                          const callbackUrl = `${window.location.pathname}${window.location.search}`;
+                          router.push(
+                            `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+                          );
+                        }}
                         className={cn(
-                          "h-8 rounded-[6px] px-3 text-xs",
-                          postAsMe
+                          "h-7 rounded-[5px] px-2.5 text-[11px] disabled:cursor-wait",
+                          session?.user && postAsMe
                             ? "bg-white font-bold text-[var(--plum)] shadow-sm"
                             : "text-[var(--ink-soft)]",
                         )}
@@ -975,37 +1033,36 @@ export function BoobooApp({
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-xs text-[var(--ink-soft)]">
-                    익명으로 올라갑니다.
-                  </p>
-                )}
+                </div>
                 {session?.user ? (
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-[var(--ink-soft)] opacity-70">
-                    <input
-                      type="checkbox"
-                      checked={newPost.showAuthorGender}
-                      onChange={(event) =>
-                        setNewPost((current) => ({
-                          ...current,
-                          showAuthorGender: event.target.checked,
-                        }))
-                      }
-                      className="size-3.5 accent-[var(--plum)]"
-                    />
-                    글쓴이 성별 표시
-                  </label>
+                  <AuthorPersonaPicker
+                    personas={profilePersonas ?? []}
+                    selectedIds={newPost.authorPersonaIds}
+                    loading={profilePersonas === null}
+                    onChange={(authorPersonaIds) =>
+                      setNewPost((current) => ({
+                        ...current,
+                        authorPersonaIds,
+                      }))
+                    }
+                    onPersonaCreated={(persona) =>
+                      setProfilePersonas((current) => [
+                        ...(current ?? []),
+                        persona,
+                      ])
+                    }
+                  />
                 ) : null}
+                <CommentPersonaRequestEditor
+                  value={newPost.commentPersonaRequests}
+                  onChange={(commentPersonaRequests) =>
+                    setNewPost((current) => ({
+                      ...current,
+                      commentPersonaRequests,
+                    }))
+                  }
+                />
               </div>
-              <CommentPersonaRequestEditor
-                value={newPost.commentPersonaRequests}
-                onChange={(commentPersonaRequests) =>
-                  setNewPost((current) => ({
-                    ...current,
-                    commentPersonaRequests,
-                  }))
-                }
-              />
               <div className="mt-3 flex justify-end">
                 <button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--plum)] px-4 text-sm font-bold text-white">
                   <Send className="size-4" />
@@ -1109,7 +1166,7 @@ export function BoobooApp({
                     verifiedCount={selectedPost.authorVerifiedPersonaCount ?? 0}
                     compact
                   />
-                  <GenderBadge gender={selectedPost.authorGender} />
+                  <PostAuthorPersonaBadges post={selectedPost} />
                   <span className="text-xs text-[var(--ink-soft)]">
                     · {selectedPost.createdAt}
                   </span>
@@ -1951,7 +2008,7 @@ function MobilePostDetail({
           verifiedCount={post.authorVerifiedPersonaCount ?? 0}
           compact
         />
-        <GenderBadge gender={post.authorGender} />
+        <PostAuthorPersonaBadges post={post} />
         <span className="text-xs text-[var(--ink-soft)]">· {post.createdAt}</span>
       </div>
       <p className="mt-6 whitespace-pre-line text-base leading-8 text-[#312d2a]">
@@ -2083,14 +2140,30 @@ function CommentIdentityControl({
   );
 }
 
-function GenderBadge({ gender }: { gender?: CommentItem["authorGender"] }) {
-  if (!gender) return null;
+function PostAuthorPersonaBadges({ post }: { post: CommunityPost }) {
+  const personas = post.authorPersonas?.length
+    ? post.authorPersonas
+    : post.authorGender
+      ? [
+          {
+            type: "GENDER" as const,
+            label: "성별",
+            value: post.authorGender,
+            verified: false,
+          },
+        ]
+      : [];
 
-  return (
-    <span className="rounded-[4px] border border-[#ded4cc] bg-white px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#756c66]">
-      {gender}
+  return personas.map((persona) => (
+    <span
+      key={persona.type}
+      title={`${persona.label}${persona.verified ? " · 인증됨" : ""}`}
+      className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-[4px] border border-[#ded4cc] bg-white px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#756c66]"
+    >
+      {persona.verified ? <Check className="size-2.5" aria-hidden="true" /> : null}
+      {persona.value}
     </span>
-  );
+  ));
 }
 
 function personaRequestsForPost(post: CommunityPost) {

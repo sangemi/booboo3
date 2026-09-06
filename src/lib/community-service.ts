@@ -302,6 +302,7 @@ export async function createCommunityPost(input: {
   userId?: string;
   isAnonymous: boolean;
   showAuthorGender: boolean;
+  authorPersonaIds: string[];
   showCommenterGender: boolean;
   commentPersonaRequests: CommentPersonaRequest[];
 }) {
@@ -313,9 +314,20 @@ export async function createCommunityPost(input: {
   const author = input.userId
     ? await prisma.user.findUnique({
         where: { id: input.userId },
-        select: { name: true, nickname: true },
+        select: authorSelect,
       })
     : null;
+  const legacyGenderPersonaId = input.showAuthorGender
+    ? author?.personas.find((persona) => persona.type === PersonaType.GENDER)?.id
+    : undefined;
+  const authorPersonaSnapshots = resolvePostAuthorPersonaSnapshots(
+    input.authorPersonaIds.length > 0
+      ? input.authorPersonaIds
+      : legacyGenderPersonaId
+        ? [legacyGenderPersonaId]
+        : [],
+    author?.personas ?? [],
+  );
 
   const post = await prisma.post.create({
     data: {
@@ -332,7 +344,10 @@ export async function createCommunityPost(input: {
       readMinutes: Math.max(1, Math.ceil(input.body.length / 180)),
       tags: input.tags.length > 0 ? input.tags : ["새글"],
       isAnonymous,
-      showAuthorGender: Boolean(input.userId && input.showAuthorGender),
+      showAuthorGender: authorPersonaSnapshots.some(
+        (persona) => persona.type === "GENDER",
+      ),
+      authorPersonaSnapshots,
       showCommenterGender: commentPersonaRequests.some(
         (request) => request.type === "GENDER",
       ),
@@ -946,6 +961,9 @@ function toCommunityPost(
     authorGender: post.showAuthorGender
       ? genderFromAuthor(post.author, true)
       : undefined,
+    authorPersonas: normalizeCommentPersonaSnapshots(
+      post.authorPersonaSnapshots,
+    ),
     authorVerifiedPersonaCount: post.isAnonymous
       ? 0
       : post.author?._count.personas ?? 0,
@@ -1195,6 +1213,32 @@ function snapshotFromPersona(
     value: displayPersonaValue(type, persona.value, persona.normalizedValue),
     verified: persona.status === PersonaVerificationStatus.VERIFIED,
   };
+}
+
+function resolvePostAuthorPersonaSnapshots(
+  personaIds: string[],
+  personas: NonNullable<AuthorSummary>["personas"],
+) {
+  const selectedIds = new Set(personaIds);
+  const seenTypes = new Set<CommentPersonaType>();
+
+  return personas
+    .filter(
+      (persona) =>
+        selectedIds.has(persona.id) &&
+        commentPersonaTypes.includes(persona.type as CommentPersonaType),
+    )
+    .sort(
+      (left, right) =>
+        commentPersonaTypes.indexOf(left.type as CommentPersonaType) -
+        commentPersonaTypes.indexOf(right.type as CommentPersonaType),
+    )
+    .flatMap((persona): CommentPersonaSnapshot[] => {
+      const type = persona.type as CommentPersonaType;
+      if (seenTypes.has(type)) return [];
+      seenTypes.add(type);
+      return [snapshotFromPersona(persona)];
+    });
 }
 
 function displayPersonaValue(

@@ -228,6 +228,7 @@ model Post {
   isAnonymous        Boolean       @default(false)
   showAuthorGender   Boolean       @default(false)
   showCommenterGender Boolean       @default(true)
+  authorPersonaSnapshots Json       @default("[]")
   commentPersonaRequests Json       @default("[]")
   tags               String[]      @default([])
   /// Legacy compatibility for booboo2 URLs and migrated posts.
