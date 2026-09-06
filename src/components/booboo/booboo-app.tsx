@@ -10,6 +10,7 @@ import {
   Lock,
   MessageCircle,
   Pencil,
+  Plus,
   Send,
   Sparkles,
   ThumbsDown,
@@ -834,7 +835,6 @@ export function BoobooApp({
         active="community"
         query={query}
         onQueryChange={setQuery}
-        onWriteClick={() => setComposerOpen((value) => !value)}
         muted
         hiddenOnMobile={mobileDetailOpen}
       />
@@ -855,31 +855,51 @@ export function BoobooApp({
             </GoalHeading>
           </div>
 
-          <nav className="flex gap-1 overflow-x-auto rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] p-1 opacity-80 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {categories.map((category) => {
-              const active = activeCategory === category.key;
+          <div className="flex overflow-hidden rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] opacity-80 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100">
+            <nav className="flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {categories.map((category) => {
+                const active = activeCategory === category.key;
 
-              return (
-                <button
-                  key={category.key}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => selectCategory(category.key)}
-                  className={cn(
-                    "h-10 shrink-0 rounded-[6px] px-3 text-sm font-bold transition sm:px-4",
-                    active
-                      ? "bg-[var(--plum)] text-white"
-                      : "text-[var(--ink-soft)] hover:bg-[#f7eee7] hover:text-[var(--foreground)]",
-                  )}
-                >
-                  {category.label}
-                </button>
-              );
-            })}
-          </nav>
+                return (
+                  <button
+                    key={category.key}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => selectCategory(category.key)}
+                    className={cn(
+                      "h-10 shrink-0 rounded-[6px] px-3 text-sm font-bold transition sm:px-4",
+                      active
+                        ? "bg-[var(--plum)] text-white"
+                        : "text-[var(--ink-soft)] hover:bg-[#f7eee7] hover:text-[var(--foreground)]",
+                    )}
+                  >
+                    {category.label}
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="shrink-0 border-l border-[#eee6df] p-1">
+              <button
+                type="button"
+                aria-expanded={composerOpen}
+                aria-controls="community-composer"
+                onClick={() => setComposerOpen((value) => !value)}
+                className={cn(
+                  "inline-flex h-10 items-center justify-center gap-1.5 rounded-[6px] px-3 text-xs font-bold transition sm:px-4 sm:text-sm",
+                  composerOpen
+                    ? "bg-[#f4ebe3] text-[var(--plum)]"
+                    : "bg-[var(--coral)] text-white hover:bg-[#ef665a]",
+                )}
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                글쓰기
+              </button>
+            </div>
+          </div>
 
           {composerOpen ? (
             <form
+              id="community-composer"
               onSubmit={submitPost}
               className="rounded-[8px] border border-[var(--line)] bg-white p-4 shadow-[0_14px_40px_rgba(75,54,38,0.08)]"
             >

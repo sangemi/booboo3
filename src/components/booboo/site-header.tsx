@@ -8,7 +8,6 @@ import {
   LogIn,
   LogOut,
   Menu,
-  Plus,
   Search,
   ShieldCheck,
   UserRound,
@@ -24,7 +23,6 @@ type SiteHeaderProps = {
   active: "about" | "community" | "company";
   query?: string;
   onQueryChange?: (value: string) => void;
-  onWriteClick?: () => void;
   muted?: boolean;
   hiddenOnMobile?: boolean;
 };
@@ -38,7 +36,6 @@ export function SiteHeader({
   active,
   query,
   onQueryChange,
-  onWriteClick,
   muted = false,
   hiddenOnMobile = false,
 }: SiteHeaderProps) {
@@ -46,7 +43,7 @@ export function SiteHeader({
   const [profileOpen, setProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const { data: session, status } = useSession();
-  const showCommunityActions = query !== undefined && onQueryChange && onWriteClick;
+  const showCommunitySearch = query !== undefined && onQueryChange;
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -118,25 +115,16 @@ export function SiteHeader({
         </nav>
 
         <div className="hidden min-w-0 items-center gap-2 lg:flex">
-          {showCommunityActions ? (
-            <>
-              <label className="relative w-52 xl:w-64">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-soft)]" />
-                <input
-                  value={query}
-                  onChange={(event) => onQueryChange(event.target.value)}
-                  className="h-10 w-full rounded-[8px] border border-[var(--line)] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[var(--plum)] focus:ring-4 focus:ring-[rgba(111,61,91,0.12)]"
-                  placeholder="집안일, 사과, 기념일..."
-                />
-              </label>
-              <button
-                onClick={onWriteClick}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[var(--coral)] px-3 text-sm font-bold text-white shadow-[0_10px_28px_rgba(255,111,97,0.18)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[rgba(255,111,97,0.24)] lg:px-4"
-              >
-                <Plus className="size-4" />
-                글쓰기
-              </button>
-            </>
+          {showCommunitySearch ? (
+            <label className="relative w-52 xl:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-soft)]" />
+              <input
+                value={query}
+                onChange={(event) => onQueryChange(event.target.value)}
+                className="h-10 w-full rounded-[8px] border border-[var(--line)] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[var(--plum)] focus:ring-4 focus:ring-[rgba(111,61,91,0.12)]"
+                placeholder="집안일, 사과, 기념일..."
+              />
+            </label>
           ) : null}
 
           {status === "authenticated" && session.user ? (
@@ -239,8 +227,8 @@ export function SiteHeader({
             ) : null}
           </nav>
 
-          {showCommunityActions ? (
-            <div className="mt-3 grid gap-2">
+          {showCommunitySearch ? (
+            <div className="mt-3">
               <label className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-soft)]" />
                 <input
@@ -250,16 +238,6 @@ export function SiteHeader({
                   placeholder="게시글 검색"
                 />
               </label>
-              <button
-                onClick={() => {
-                  onWriteClick();
-                  setMobileOpen(false);
-                }}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[var(--coral)] px-4 text-sm font-bold text-white"
-              >
-                <Plus className="size-4" />
-                글쓰기
-              </button>
             </div>
           ) : null}
         </div>
