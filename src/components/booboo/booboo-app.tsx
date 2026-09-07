@@ -1244,7 +1244,7 @@ export function BoobooApp({
                       />
                     ) : null}
                     <div className="mt-2 flex gap-2">
-                      <input
+                      <textarea
                         value={commentDrafts[selectedPost.id] ?? ""}
                         onChange={(event) =>
                           setCommentDrafts((current) => ({
@@ -1252,7 +1252,9 @@ export function BoobooApp({
                             [selectedPost.id]: event.target.value,
                           }))
                         }
-                        className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
+                        rows={2}
+                        maxLength={1200}
+                        className="min-h-10 min-w-0 flex-1 resize-y rounded-[8px] border border-[var(--line)] px-3 py-2 text-sm leading-5 outline-none focus:border-[var(--plum)]"
                         placeholder="댓글을 적어주세요."
                       />
                       <button
@@ -2070,10 +2072,12 @@ function MobilePostDetail({
             />
           ) : null}
           <div className="mt-2 flex gap-2">
-            <input
+            <textarea
               value={commentDraft}
               onChange={(event) => onCommentDraftChange(event.target.value)}
-              className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--line)] px-3 text-sm outline-none focus:border-[var(--plum)]"
+              rows={2}
+              maxLength={1200}
+              className="min-h-10 min-w-0 flex-1 resize-y rounded-[8px] border border-[var(--line)] px-3 py-2 text-sm leading-5 outline-none focus:border-[var(--plum)]"
               placeholder="댓글을 적어주세요."
             />
             <button
