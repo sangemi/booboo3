@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       posts,
       source: "database",
-    });
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Failed to list community posts", error);
     return NextResponse.json({ posts: seedPosts, source: "seed" });

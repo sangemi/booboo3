@@ -1,6 +1,7 @@
 import type {
   CommentPersonaRequest,
   CommentPersonaSnapshot,
+  CommentPersonaType,
 } from "@/lib/comment-persona";
 
 export type CategoryKey =
@@ -58,6 +59,8 @@ export type CommentItem = {
   createdAtIso?: string;
   updatedAtIso?: string;
   canManage?: boolean;
+  isPublished?: boolean;
+  pendingPersonaTypes?: CommentPersonaType[];
   upvotes?: number;
   downvotes?: number;
   myReaction?: "up" | "down" | null;

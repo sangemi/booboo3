@@ -21,12 +21,12 @@ import {
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { CommentPersonaLayer } from "@/components/booboo/comment-persona-layer";
 import { VerifiedName } from "@/components/booboo/verified-name";
 import {
   AuthorPersonaPicker,
-  CommentPersonaDialog,
   CommentPersonaRequestEditor,
   type ProfilePersonaOption,
 } from "@/components/booboo/comment-persona-controls";
@@ -104,6 +104,9 @@ export function BoobooApp({
     initialCategory ?? "all",
   );
   const [goalMessageIndex, setGoalMessageIndex] = useState(0);
+  const [showGoal, setShowGoal] = useState(false);
+  const [adminViewCounts, setAdminViewCounts] = useState<Record<number, number>>({});
+  const canReadViews = session?.user?.email?.trim().toLowerCase() === "sangemi@daum.net";
   const [query, setQuery] = useState("");
   const [todayMission, setTodayMission] = useState<Mission>(
     () => initialMission ?? dailyMissionSelection().mission,
@@ -143,15 +146,14 @@ export function BoobooApp({
   const [profilePersonas, setProfilePersonas] = useState<
     ProfilePersonaOption[] | null
   >(null);
-  const [commentPersonaDialog, setCommentPersonaDialog] = useState<{
-    postId: string;
-    requests: CommentPersonaRequest[];
-    personas: ProfilePersonaOption[];
-  } | null>(null);
+  const [personaPromptIds, setPersonaPromptIds] = useState<string[]>([]);
+  const commentSubmitting = useRef(false);
+  const [commentPending, setCommentPending] = useState(false);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setGoalMessageIndex(Math.floor(Math.random() * goalMessages.length));
+      setShowGoal(Math.random() < 0.1);
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
@@ -246,6 +248,31 @@ export function BoobooApp({
 
   const selectedPost =
     filteredPosts.find((post) => post.id === selectedPostId) ?? filteredPosts[0];
+  const viewPostId = selectedPost?.publicId;
+  const viewPostIds = posts.map((post) => post.publicId).slice(0, 100).join(",");
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        if (viewPostId && (mobileDetailOpen || window.matchMedia("(min-width: 1280px)").matches)) {
+          await fetch("/api/community/post-views", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ publicId: viewPostId }),
+          });
+        }
+        if (!canReadViews || !viewPostIds) return;
+        const response = await fetch(`/api/community/post-views?ids=${viewPostIds}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json() as { counts: Record<number, number> };
+        if (active) setAdminViewCounts(payload.counts);
+      } catch {
+        // View tracking must never interrupt reading or commenting.
+      }
+    }, 500);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [viewPostId, viewPostIds, mobileDetailOpen, canReadViews, sessionStatus]);
   const selectedLetter = communityLetters.find(
     (letter) => letter.id === selectedLetterId,
   );
@@ -313,23 +340,6 @@ export function BoobooApp({
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [missionOpen]);
-
-  useEffect(() => {
-    if (!commentPersonaDialog) return;
-
-    const originalOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCommentPersonaDialog(null);
-    };
-
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [commentPersonaDialog]);
 
   useEffect(() => {
     if (!composerOpen || !session?.user || profilePersonas !== null) return;
@@ -534,61 +544,43 @@ export function BoobooApp({
   async function submitComment(postId: string, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const draft = commentDrafts[postId]?.trim();
-    if (!draft || commentCoolingDown) return;
-    setCommentSubmitErrors((current) => ({ ...current, [postId]: "" }));
-
-    const post = posts.find((item) => item.id === postId);
-    const requests = post ? personaRequestsForPost(post) : [];
-    if (requests.length === 0) {
-      await persistComment(postId, draft, []);
-      return;
+    if (!draft || commentCoolingDown || commentSubmitting.current) return;
+    commentSubmitting.current = true;
+    setCommentPending(true);
+    try {
+      await persistComment(postId, draft);
+    } finally {
+      commentSubmitting.current = false;
+      setCommentPending(false);
     }
-
-    const personas = session?.user ? await loadProfilePersonas() : [];
-    const disclosures: CommentPersonaDisclosure[] = [];
-    const shouldAsk = requests.some((request) => {
-      const publicOptions = personas.filter(
-        (persona) => persona.type === request.type && persona.isPublic,
-      );
-      if (publicOptions.length === 1) {
-        disclosures.push({
-          type: request.type,
-          personaId: publicOptions[0].id,
-        });
-        return false;
-      }
-      return true;
-    });
-
-    if (shouldAsk) {
-      setCommentPersonaDialog({ postId, requests, personas });
-      return;
-    }
-
-    await persistComment(postId, draft, disclosures);
   }
 
-  async function loadProfilePersonas() {
-    if (profilePersonas) return profilePersonas;
-
-    try {
-      const response = await fetch("/api/profile", { cache: "no-store" });
-      if (!response.ok) return [];
-      const payload = (await response.json()) as {
-        personas?: ProfilePersonaOption[];
-      };
-      const personas = payload.personas ?? [];
-      setProfilePersonas(personas);
-      return personas;
-    } catch {
-      return [];
+  async function updateCommentPersonas(
+    postId: string,
+    commentId: string,
+    personaDisclosures: CommentPersonaDisclosure[],
+  ) {
+    const response = await fetch(`/api/community/comments/${commentId}/personas`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personaDisclosures }),
+    });
+    const payload = (await response.json()) as { comment?: CommentItem; error?: string };
+    if (!response.ok || !payload.comment) {
+      throw new Error(payload.error ?? "정보를 저장하지 못했습니다. 다시 시도해 주세요.");
     }
+    setPosts((current) => current.map((post) => post.id === postId
+      ? { ...post, comments: post.comments.map((comment) => comment.id === commentId ? payload.comment! : comment) }
+      : post));
+  }
+
+  function dismissPersonaPrompt(commentId: string) {
+    setPersonaPromptIds((current) => current.filter((id) => id !== commentId));
   }
 
   async function persistComment(
     postId: string,
     draft: string,
-    personaDisclosures: CommentPersonaDisclosure[],
   ) {
     setCommentSubmitErrors((current) => ({ ...current, [postId]: "" }));
 
@@ -600,7 +592,6 @@ export function BoobooApp({
           body: draft,
           tone: "support",
           isAnonymous: !commentAsMe,
-          personaDisclosures,
         }),
       });
 
@@ -608,7 +599,6 @@ export function BoobooApp({
         comment?: CommentItem;
         error?: string;
         retryAfterSeconds?: number;
-        missingTypes?: CommentPersonaRequest["type"][];
       };
 
       if (response.status === 429) {
@@ -618,16 +608,6 @@ export function BoobooApp({
           ...current,
           [postId]: `댓글은 10초에 한 번 작성할 수 있습니다. ${retryAfterSeconds}초 후 다시 시도해 주세요.`,
         }));
-        return false;
-      }
-
-      if (response.status === 409 && payload.missingTypes?.length) {
-        const post = posts.find((item) => item.id === postId);
-        setCommentPersonaDialog({
-          postId,
-          requests: post ? personaRequestsForPost(post) : [],
-          personas: session?.user ? await loadProfilePersonas() : [],
-        });
         return false;
       }
 
@@ -641,6 +621,7 @@ export function BoobooApp({
         );
         setCommentDrafts((current) => ({ ...current, [postId]: "" }));
         setCommentCooldownSeconds(10);
+        setPersonaPromptIds((current) => [...current, payload.comment!.id]);
         return true;
       }
     } catch {
@@ -884,16 +865,16 @@ export function BoobooApp({
 
       <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 md:px-8 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_280px]">
         <section className="min-w-0 space-y-4">
-          <div className="rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] px-4 py-3 text-[#6f6964] opacity-80 transition-opacity duration-200 hover:opacity-100 md:px-5">
-            <GoalHeading className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-normal leading-6 md:text-base">
-              <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 text-[11px] font-bold text-[var(--plum)]">
+          {showGoal ? <div className="rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] px-4 py-3 text-[#6f6964] opacity-80 transition-opacity duration-200 hover:opacity-100 md:px-5">
+            <GoalHeading className="text-sm font-normal leading-7 md:text-base">
+              <span className="mr-2 inline-flex items-center gap-1.5 rounded-[6px] bg-[#f4ebe3] px-2.5 py-1 align-middle text-[11px] font-bold text-[var(--plum)]">
                 <Sparkles className="size-3.5" />
                 목표
               </span>
               {" "}
               <span>{goalMessages[goalMessageIndex]}</span>
             </GoalHeading>
-          </div>
+          </div> : null}
 
           <div className="flex overflow-hidden rounded-[8px] border border-[#eee6df] bg-[#fcfaf8] opacity-80 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100">
             <nav className="flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1078,7 +1059,7 @@ export function BoobooApp({
           ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="overflow-hidden rounded-[8px] border border-[#ebe3dc] bg-[#fffdfa] opacity-80 transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100">
+            <div className="overflow-hidden rounded-[8px] border border-[#ebe3dc] bg-[#fffdfa]">
               {filteredPosts.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-sm text-[var(--ink-soft)]">
@@ -1112,7 +1093,7 @@ export function BoobooApp({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-[11px] font-bold text-[var(--plum)]">
+                        <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-[11px] font-medium text-[var(--plum)] opacity-75">
                           {categoryLabels[post.category]}
                         </span>
                         <span className="text-[11px] text-[var(--ink-soft)]">
@@ -1131,20 +1112,23 @@ export function BoobooApp({
                         </span>
                         <span className="inline-flex items-center gap-1 text-[var(--leaf)]">
                           <MessageCircle className="size-3.5" />
-                          {post.comments.length}
+                          {post.comments.filter((comment) => comment.isPublished !== false).length}
                         </span>
                       </div>
                     </div>
                     <h3
                       className={cn(
-                        "mt-2 text-sm leading-snug md:text-base",
+                        "mt-2 text-[15px] leading-snug md:text-[17px]",
                         selected
                           ? "font-extrabold text-[var(--foreground)]"
-                          : "font-normal text-[#716b66]",
+                          : "font-normal text-[#3f3a36]",
                       )}
                     >
                       {post.title}
                     </h3>
+                    {canReadViews && adminViewCounts[post.publicId] !== undefined ? (
+                      <span className="mt-1 block text-[11px] text-[var(--ink-soft)]">(관.조회수 {adminViewCounts[post.publicId]})</span>
+                    ) : null}
                   </Link>
                 );
               })}
@@ -1171,6 +1155,9 @@ export function BoobooApp({
                     · {selectedPost.createdAt}
                   </span>
                 </div>
+                {canReadViews && adminViewCounts[selectedPost.publicId] !== undefined ? (
+                  <p className="mt-2 text-xs text-[var(--ink-soft)]">(관.조회수 {adminViewCounts[selectedPost.publicId]})</p>
+                ) : null}
                 <p className="mt-6 whitespace-pre-line text-[17px] leading-9 text-[#312d2a]">
                   {selectedPost.body}
                 </p>
@@ -1206,7 +1193,7 @@ export function BoobooApp({
                 <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100">
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="text-sm font-extrabold">
-                      댓글 {selectedPost.comments.length}
+                      댓글 {selectedPost.comments.filter((comment) => comment.isPublished !== false).length}
                     </h4>
                     <CommentPersonaRequestSummary post={selectedPost} />
                   </div>
@@ -1216,6 +1203,11 @@ export function BoobooApp({
                         <CommentCard
                           key={comment.id}
                           comment={comment}
+                          requests={personaRequestsForPost(selectedPost)}
+                          signedIn={Boolean(session?.user)}
+                          showPersonaPrompt={personaPromptIds.includes(comment.id)}
+                          onDismissPersonaPrompt={() => dismissPersonaPrompt(comment.id)}
+                          onSavePersonas={(disclosures) => updateCommentPersonas(selectedPost.id, comment.id, disclosures)}
                           onUpdate={(body) =>
                             updateComment(selectedPost.id, comment.id, body)
                           }
@@ -1259,7 +1251,7 @@ export function BoobooApp({
                       />
                       <button
                         aria-label="댓글 등록"
-                        disabled={commentCoolingDown}
+                        disabled={commentCoolingDown || commentPending}
                         className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Send className="size-4" />
@@ -1502,9 +1494,14 @@ export function BoobooApp({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
             <MobilePostDetail
               post={selectedPost}
+              adminViewCount={canReadViews ? adminViewCounts[selectedPost.publicId] : undefined}
               commentDraft={commentDrafts[selectedPost.id] ?? ""}
               commentError={commentSubmitErrors[selectedPost.id] ?? ""}
               commentCoolingDown={commentCoolingDown}
+              commentPending={commentPending}
+              personaPromptIds={personaPromptIds}
+              onDismissPersonaPrompt={dismissPersonaPrompt}
+              onSavePersonas={(commentId, disclosures) => updateCommentPersonas(selectedPost.id, commentId, disclosures)}
               onCommentDraftChange={(value) =>
                 setCommentDrafts((current) => ({
                   ...current,
@@ -1589,30 +1586,6 @@ export function BoobooApp({
             </footer>
           </section>
         </div>
-      ) : null}
-
-      {commentPersonaDialog ? (
-        <CommentPersonaDialog
-          open
-          requests={commentPersonaDialog.requests}
-          personas={commentPersonaDialog.personas}
-          signedIn={Boolean(session?.user)}
-          onClose={() => setCommentPersonaDialog(null)}
-          onConfirm={async (personaDisclosures) => {
-            const draft = commentDrafts[commentPersonaDialog.postId]?.trim();
-            if (!draft) return false;
-            const saved = await persistComment(
-              commentPersonaDialog.postId,
-              draft,
-              personaDisclosures,
-            );
-            if (saved) {
-              setCommentPersonaDialog(null);
-              setProfilePersonas(null);
-            }
-            return saved;
-          }}
-        />
       ) : null}
 
       <SiteFooter />
@@ -1739,11 +1712,21 @@ function visibleCategoryForPost(
 
 function CommentCard({
   comment,
+  requests,
+  signedIn,
+  showPersonaPrompt,
+  onDismissPersonaPrompt,
+  onSavePersonas,
   onUpdate,
   onDelete,
   onReact,
 }: {
   comment: CommentItem;
+  requests: CommentPersonaRequest[];
+  signedIn: boolean;
+  showPersonaPrompt: boolean;
+  onDismissPersonaPrompt: () => void;
+  onSavePersonas: (disclosures: CommentPersonaDisclosure[]) => Promise<void>;
   onUpdate: (body: string) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
   onReact: (type: "up" | "down") => Promise<boolean>;
@@ -1791,10 +1774,18 @@ function CommentCard({
     }
   }
 
+  const pendingRequests: CommentPersonaRequest[] = (comment.pendingPersonaTypes ?? [])
+    .map((type) => ({ type, level: "REQUIRED" }));
+  const optionalRequests = showPersonaPrompt ? requests.filter(
+    (request) => request.level === "REQUESTED" && !comment.personas?.some((persona) => persona.type === request.type),
+  ) : [];
+  const layerRequests = pendingRequests.length > 0 ? pendingRequests : optionalRequests;
+
   return (
+    <div>
     <div
       id={`comment-${comment.id}`}
-      className="rounded-[8px] bg-[#fbf6f0] p-3"
+      className={cn("rounded-[8px] p-3", comment.isPublished === false ? "bg-[#f1f1f1] text-[#777]" : "bg-[#fbf6f0]")}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -1812,6 +1803,12 @@ function CommentCard({
             />
           </span>
           <CommentPersonaBadges comment={comment} />
+          {comment.isPublished === false ? (
+            <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#e5e5e5] px-1.5 py-0.5 text-[10px] text-[#666]">
+              <Lock className="size-3" aria-hidden="true" />
+              공개되지 않음
+            </span>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <span className="text-xs text-[var(--ink-soft)]">
@@ -1912,14 +1909,14 @@ function CommentCard({
         </div>
       ) : null}
 
-      {!comment.canManage ? (
+      {comment.isPublished !== false ? (
         <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
-            title="댓글 좋아요"
-            aria-label="댓글 좋아요"
+            title={comment.canManage ? "내 댓글에는 추천할 수 없습니다" : "댓글 추천"}
+            aria-label="댓글 추천"
             aria-pressed={comment.myReaction === "up"}
-            disabled={pending}
+            disabled={pending || comment.canManage}
             onClick={() => react("up")}
             className={cn(
               "inline-flex h-8 items-center gap-1 rounded-[6px] border px-2.5 text-xs font-bold transition disabled:opacity-40",
@@ -1933,10 +1930,10 @@ function CommentCard({
           </button>
           <button
             type="button"
-            title="댓글 싫어요"
-            aria-label="댓글 싫어요"
+            title={comment.canManage ? "내 댓글에는 비추천할 수 없습니다" : "댓글 비추천"}
+            aria-label="댓글 비추천"
             aria-pressed={comment.myReaction === "down"}
-            disabled={pending}
+            disabled={pending || comment.canManage}
             onClick={() => react("down")}
             className={cn(
               "inline-flex h-8 items-center gap-1 rounded-[6px] border px-2.5 text-xs font-bold transition disabled:opacity-40",
@@ -1957,11 +1954,26 @@ function CommentCard({
         </p>
       ) : null}
     </div>
+    {comment.canManage && layerRequests.length > 0 ? (
+      <CommentPersonaLayer
+        key={layerRequests.map((request) => request.type + request.level).join("-")}
+        requests={layerRequests}
+        signedIn={signedIn}
+        onSave={onSavePersonas}
+        onDismiss={onDismissPersonaPrompt}
+      />
+    ) : null}
+    </div>
   );
 }
 
 function MobilePostDetail({
+  adminViewCount,
   post,
+  commentPending,
+  personaPromptIds,
+  onDismissPersonaPrompt,
+  onSavePersonas,
   commentDraft,
   commentError,
   commentCoolingDown,
@@ -1977,6 +1989,11 @@ function MobilePostDetail({
   onVerdict,
 }: {
   post: CommunityPost;
+  adminViewCount?: number;
+  commentPending: boolean;
+  personaPromptIds: string[];
+  onDismissPersonaPrompt: (commentId: string) => void;
+  onSavePersonas: (commentId: string, disclosures: CommentPersonaDisclosure[]) => Promise<void>;
   commentDraft: string;
   commentError: string;
   commentCoolingDown: boolean;
@@ -2013,6 +2030,9 @@ function MobilePostDetail({
         <PostAuthorPersonaBadges post={post} />
         <span className="text-xs text-[var(--ink-soft)]">· {post.createdAt}</span>
       </div>
+      {adminViewCount !== undefined ? (
+        <p className="mt-2 text-xs text-[var(--ink-soft)]">(관.조회수 {adminViewCount})</p>
+      ) : null}
       <p className="mt-6 whitespace-pre-line text-base leading-8 text-[#312d2a]">
         {post.body}
       </p>
@@ -2044,7 +2064,7 @@ function MobilePostDetail({
 
       <div className="mt-6 border-t border-[var(--line)] pt-5 opacity-65 transition-opacity duration-200 focus-within:opacity-100">
         <div className="flex flex-wrap items-center gap-2">
-          <h4 className="text-sm font-extrabold">댓글 {post.comments.length}</h4>
+          <h4 className="text-sm font-extrabold">댓글 {post.comments.filter((comment) => comment.isPublished !== false).length}</h4>
           <CommentPersonaRequestSummary post={post} />
         </div>
         <div className="mt-3 space-y-3">
@@ -2054,6 +2074,11 @@ function MobilePostDetail({
                 key={comment.id}
                 comment={comment}
                 onUpdate={(body) => onUpdateComment(comment.id, body)}
+                requests={personaRequestsForPost(post)}
+                signedIn={canUseName}
+                showPersonaPrompt={personaPromptIds.includes(comment.id)}
+                onDismissPersonaPrompt={() => onDismissPersonaPrompt(comment.id)}
+                onSavePersonas={(disclosures) => onSavePersonas(comment.id, disclosures)}
                 onDelete={() => onDeleteComment(comment.id)}
                 onReact={(type) => onReactToComment(comment.id, type)}
               />
@@ -2082,7 +2107,7 @@ function MobilePostDetail({
             />
             <button
               aria-label="댓글 등록"
-              disabled={commentCoolingDown}
+              disabled={commentCoolingDown || commentPending}
               className="grid size-10 shrink-0 place-items-center rounded-[8px] bg-[var(--plum)] text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send className="size-4" />

@@ -63,6 +63,10 @@ export const updateCommentSchema = z.object({
   body: z.string().trim().min(2).max(1200),
 });
 
+export const updateCommentPersonasSchema = createCommentSchema.pick({
+  personaDisclosures: true,
+});
+
 export const createCommentReactionSchema = z.object({
   type: z.enum(["up", "down"]),
 });

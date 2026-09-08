@@ -1,0 +1,2 @@
+ALTER TABLE "Comment"
+ADD COLUMN "pendingPersonaTypes" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

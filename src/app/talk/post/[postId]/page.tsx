@@ -104,6 +104,7 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
     : [post, ...posts];
 
   const url = postUrl(post.publicId);
+  const publicComments = post.comments.filter((comment) => comment.isPublished !== false);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "DiscussionForumPosting",
@@ -118,8 +119,8 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
     },
     datePublished: post.createdAtIso,
     dateModified: post.updatedAtIso,
-    commentCount: post.comments.length,
-    comment: post.comments.map((comment) => ({
+    commentCount: publicComments.length,
+    comment: publicComments.map((comment) => ({
       "@type": "Comment",
       "@id": `${url}#comment-${comment.id}`,
       text: comment.body,
@@ -143,7 +144,7 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
     interactionStatistic: {
       "@type": "InteractionCounter",
       interactionType: "https://schema.org/CommentAction",
-      userInteractionCount: post.comments.length,
+      userInteractionCount: publicComments.length,
     },
     isPartOf: { "@id": `${SITE_URL}/#website` },
     inLanguage: "ko-KR",

@@ -257,11 +257,21 @@ model Post {
   reactions          Reaction[]
   verdictVotes       VerdictVote[]
   feedback           Feedback[]
+  views              PostView[]
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
   @@index([category, createdAt])
   @@index([legacyId])
+}
+
+model PostView {
+  id        String   @id
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([postId])
 }
 
 model Comment {
@@ -275,6 +285,7 @@ model Comment {
   body            String
   tone            CommentTone @default(SUPPORT)
   personaSnapshots Json        @default("[]")
+  pendingPersonaTypes String[] @default([])
   /// Legacy compatibility for migrated booboo2 comments.
   /// TODO(legacy): Remove after 2027-06 if old comment audit data is no longer needed.
   legacyId        Int?        @unique

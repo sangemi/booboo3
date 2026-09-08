@@ -48,10 +48,8 @@ export function SiteFooter() {
             </ul>
           </nav>
 
-          <section aria-labelledby="footer-company-heading">
-            <h2 id="footer-company-heading" className="text-sm font-extrabold">
-              OPT92 사업자 정보
-            </h2>
+          <section aria-label="사업자 정보">
+            <h2 className="text-sm font-extrabold">사업자 정보</h2>
             <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs leading-5 text-white/60">
               <dt>상호명</dt>
               <dd>{operator.businessName}</dd>

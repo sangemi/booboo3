@@ -6,10 +6,11 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-const adapter = new PrismaPg(
-  process.env.DATABASE_URL ??
-    "postgresql://booboo3_user:placeholder@localhost:5432/booboo3",
-);
+const connectionString = process.env.DATABASE_URL ??
+  "postgresql://booboo3_user:placeholder@localhost:5432/booboo3";
+const adapter = new PrismaPg(connectionString, {
+  schema: new URL(connectionString).searchParams.get("schema") ?? "public",
+});
 
 export const prisma =
   globalForPrisma.prisma ?? new PrismaClient({ adapter });
