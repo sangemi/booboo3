@@ -96,7 +96,7 @@ jobs:
               --env-file /home/ec2-user/servers/booboo3/.env \
               --add-host=host.docker.internal:host-gateway \
               ${{ env.IMAGE }} \
-              pnpm prisma migrate deploy
+              node node_modules/prisma/build/index.js migrate deploy
 
             docker stop booboo3 2>/dev/null || true
             docker rm booboo3 2>/dev/null || true
