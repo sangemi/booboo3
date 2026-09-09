@@ -45,6 +45,7 @@ import {
   VerdictState,
 } from "@/lib/community-data";
 import { cn } from "@/lib/utils";
+import { isAdminEmail } from "@/lib/admin-access";
 import {
   commentPersonaLabels,
   defaultCommentPersonaRequests,
@@ -106,7 +107,7 @@ export function BoobooApp({
   const [goalMessageIndex, setGoalMessageIndex] = useState(0);
   const [showGoal, setShowGoal] = useState(false);
   const [adminViewCounts, setAdminViewCounts] = useState<Record<number, number>>({});
-  const canReadViews = session?.user?.email?.trim().toLowerCase() === "sangemi@daum.net";
+  const canReadViews = isAdminEmail(session?.user?.email);
   const [query, setQuery] = useState("");
   const [todayMission, setTodayMission] = useState<Mission>(
     () => initialMission ?? dailyMissionSelection().mission,

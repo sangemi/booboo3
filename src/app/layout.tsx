@@ -3,6 +3,7 @@ import { Gowun_Batang, Noto_Sans_KR } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth-provider";
 import { JsonLd } from "@/components/seo/json-ld";
+import { SiteVisitTracker } from "@/components/site-visit-tracker";
 import {
   SITE_DESCRIPTION,
   SITE_LOGO_URL,
@@ -109,7 +110,10 @@ export default function RootLayout({
             },
           ]}
         />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <SiteVisitTracker />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

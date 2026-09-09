@@ -8,11 +8,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { getAdminActivityDays } from "@/lib/admin-analytics";
 import { categoryLabels } from "@/lib/community-data";
 import { categoryFromDb } from "@/lib/community-service";
 import { prisma } from "@/lib/db";
-
-type SignupDay = { label: string; count: number };
 
 export default async function AdminOverviewPage() {
   const today = startOfKoreanDay();
@@ -28,7 +27,7 @@ export default async function AdminOverviewPage() {
     totalLetters,
     balances,
     categoryCounts,
-    signupDays,
+    activityDays,
     latestUsers,
   ] = await Promise.all([
     prisma.user.count(),
@@ -42,21 +41,7 @@ export default async function AdminOverviewPage() {
       _sum: { cashBalance: true, pointBalance: true },
     }),
     prisma.post.groupBy({ by: ["category"], _count: { _all: true } }),
-    prisma.$queryRaw<SignupDay[]>`
-      WITH days AS (
-        SELECT generate_series(
-          (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - 13,
-          (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date,
-          interval '1 day'
-        )::date AS day
-      )
-      SELECT TO_CHAR(days.day, 'MM/DD') AS label, COUNT(users.id)::int AS count
-      FROM days
-      LEFT JOIN "User" users
-        ON (users."createdAt" AT TIME ZONE 'Asia/Seoul')::date = days.day
-      GROUP BY days.day
-      ORDER BY days.day
-    `,
+    getAdminActivityDays(),
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       take: 6,
@@ -71,7 +56,10 @@ export default async function AdminOverviewPage() {
     }),
   ]);
 
-  const maxSignup = Math.max(...signupDays.map((day) => day.count), 1);
+  const maxActivity = Math.max(
+    ...activityDays.flatMap((day) => [day.signups, day.visitors]),
+    1,
+  );
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-6 md:px-7 md:py-8">
@@ -93,23 +81,35 @@ export default async function AdminOverviewPage() {
         <section className="min-w-0 border-t border-[#d8d2cc] pt-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold">최근 14일 회원가입</h2>
-              <p className="mt-1 text-xs text-[#817a75]">일별 신규 계정 수</p>
+              <h2 className="text-base font-bold">최근 14일 가입과 방문</h2>
+              <p className="mt-1 text-xs text-[#817a75]">관리자 방문 제외 · 한국 시간 기준</p>
             </div>
-            <span className="text-xs font-semibold text-[#6f3d5b]">합계 {signupDays.reduce((sum, day) => sum + day.count, 0)}명</span>
+            <div className="flex items-center gap-3 text-[11px] font-semibold text-[#655f5c]" aria-label="그래프 범례">
+              <span className="inline-flex items-center gap-1.5"><span className="size-2.5 bg-[#7a4c67]" />회원가입</span>
+              <span className="inline-flex items-center gap-1.5"><span className="size-2.5 bg-[#5f8a70]" />방문자</span>
+            </div>
           </div>
-          <div className="mt-5 flex h-48 items-end gap-1.5 border-b border-[#d8d2cc] px-1">
-            {signupDays.map((day) => (
-              <div key={day.label} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2">
-                <span className="text-[10px] font-bold text-[#655f5c]">{day.count || ""}</span>
-                <div
-                  className="w-full max-w-8 bg-[#7a4c67]"
-                  style={{ height: `${Math.max(3, (day.count / maxSignup) * 128)}px` }}
-                  title={`${day.label} ${day.count}명`}
-                />
-                <span className="hidden text-[9px] text-[#8e8782] sm:block">{day.label}</span>
-              </div>
-            ))}
+          <div className="mt-5 overflow-x-auto pb-1">
+            <div className="flex h-48 min-w-[620px] items-end gap-1.5 border-b border-[#d8d2cc] px-1">
+              {activityDays.map((day) => (
+                <div key={day.label} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2">
+                  <span className="text-[9px] font-bold text-[#655f5c]">{day.signups}/{day.visitors}</span>
+                  <div className="flex h-32 w-full max-w-9 items-end justify-center gap-0.5">
+                    <div
+                      className="w-2.5 bg-[#7a4c67]"
+                      style={{ height: day.signups ? `${Math.max(3, (day.signups / maxActivity) * 128)}px` : 0 }}
+                      title={`${day.label} 회원가입 ${day.signups}명`}
+                    />
+                    <div
+                      className="w-2.5 bg-[#5f8a70]"
+                      style={{ height: day.visitors ? `${Math.max(3, (day.visitors / maxActivity) * 128)}px` : 0 }}
+                      title={`${day.label} 방문자 ${day.visitors}명`}
+                    />
+                  </div>
+                  <span className="text-[9px] text-[#8e8782]">{day.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

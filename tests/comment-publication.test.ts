@@ -14,6 +14,7 @@ const connectionString = process.env.DATABASE_URL!;
 const client = new Client({ connectionString, connectionTimeoutMillis: 10000 });
 const db = new PrismaClient({ adapter: new PrismaPg(connectionString, { schema }) });
 let service: typeof import("../src/lib/community-service");
+let analytics: typeof import("../src/lib/admin-analytics");
 let optionalPostId: string;
 let requiredPostId: string;
 let requiredPublicId: number;
@@ -31,6 +32,7 @@ before(async () => {
   await client.query(ddl.replaceAll('"public"', `"${schema}"`));
   (globalThis as unknown as { prisma: PrismaClient }).prisma = db;
   service = await import("../src/lib/community-service");
+  analytics = await import("../src/lib/admin-analytics");
   const optional = await db.post.create({ data: {
     title: "선택 정보 테스트", body: "댓글 정보 공개 흐름을 검증합니다.", category: "TALK",
     commentPersonaRequests: [{ type: "GENDER", level: "REQUESTED" }],
@@ -65,6 +67,15 @@ test("조회수 중복 집계 방지와 게시글 수정 시각 보존", async (
   const after = await db.post.findUniqueOrThrow({ where: { id: optionalPostId }, include: { _count: { select: { views: true } } } });
   assert.equal(after._count.views, 1);
   assert.equal(after.updatedAt.toISOString(), before.updatedAt.toISOString());
+});
+
+test("관리자 그래프는 최근 14일 회원가입과 고유 방문자를 함께 집계한다", async () => {
+  await db.user.create({ data: { email: "activity-test@example.test" } });
+  await db.siteVisit.create({ data: { id: "activity-test-visit" } });
+  const days = await analytics.getAdminActivityDays();
+  assert.equal(days.length, 14);
+  assert.ok(days.at(-1)!.signups >= 1);
+  assert.ok(days.at(-1)!.visitors >= 1);
 });
 
 test("선택 정보 없이 즉시 공개하고, 동의한 댓글에만 정보를 추가한다", async () => {

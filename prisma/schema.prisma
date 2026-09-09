@@ -274,6 +274,13 @@ model PostView {
   @@index([postId])
 }
 
+model SiteVisit {
+  id        String   @id
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model Comment {
   id              String      @id @default(cuid())
   postId          String
