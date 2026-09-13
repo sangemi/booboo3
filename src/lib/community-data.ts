@@ -44,12 +44,14 @@ export type CommunityPost = {
   showAuthorGender?: boolean;
   showCommenterGender?: boolean;
   commentPersonaRequests?: CommentPersonaRequest[];
+  adminHasMemberAuthor?: boolean;
 };
 
 export type CommentItem = {
   id: string;
   author: string;
   isAnonymous?: boolean;
+  isGuest?: boolean;
   authorGender?: GenderLabel;
   personas?: CommentPersonaSnapshot[];
   authorVerifiedPersonaCount?: number;
@@ -64,6 +66,7 @@ export type CommentItem = {
   upvotes?: number;
   downvotes?: number;
   myReaction?: "up" | "down" | null;
+  adminAuthorKind?: "admin" | "member" | "visitor" | "ai";
 };
 
 export type ReactionState = {
@@ -147,6 +150,108 @@ export const emptyVerdicts: VerdictState = {
   both: 0,
   notEnough: 0,
 };
+
+const conversationTopics =
+[
+  [
+    "깔끔함의 기준 맞추기",
+    "각자 정리가 필요하다고 느끼는 공간 하나와 이유를 말해보세요. 서로 불편하지 않을 최소 정리 기준 하나를 정해보세요."
+  ],
+  [
+    "약속 시간의 여유",
+    "약속에 몇 분 일찍 도착해야 편한지 나눠보세요. 다음 외출의 출발 시간과 늦어질 때 연락할 기준을 함께 정해보세요."
+  ],
+  [
+    "한 번에 하나, 동시에 여러 개",
+    "일할 때 집중이 깨지는 순간을 서로 말해보세요. 오늘 함께할 일 하나를 각자 편한 순서로 나누어보세요."
+  ],
+  [
+    "말과 행동으로 전하는 마음",
+    "애정이 잘 전해졌던 말이나 행동을 하나씩 골라보세요. 상대가 반가워하는 표현을 오늘 한 번 해보세요."
+  ],
+  [
+    "함께할 시간, 혼자일 시간",
+    "이번 주에 함께하고 싶은 시간과 혼자 쉬고 싶은 시간을 하나씩 말해보세요. 두 시간 모두 일정에 넣어보세요."
+  ],
+  [
+    "친밀함의 속도 맞추기",
+    "편하게 이야기할 수 있을 때 원하는 친밀함의 빈도와 부담을 나눠보세요. 횟수를 약속하기보다 서로 원할 때 확인할 말과 거절해도 괜찮은 신호를 정해보세요."
+  ],
+  [
+    "친밀한 대화를 여는 방법",
+    "성생활에 관해 어떤 말투와 시점이면 편하게 이야기할 수 있는지 나눠보세요. 답하기 어려운 질문은 건너뛰고, 대화를 시작할 방법 하나만 합의해보세요."
+  ],
+  [
+    "아까운 지출, 아깝지 않은 지출",
+    "각자 줄이고 싶은 지출과 지키고 싶은 지출을 하나씩 말해보세요. 이유를 듣고 다음 달 함께 조정할 항목 하나를 골라보세요."
+  ],
+  [
+    "즉흥과 계획 사이",
+    "새로운 일을 바로 해보고 싶은 순간과 알아볼 시간이 필요한 순간을 나눠보세요. 다음 주말에 즉흥으로 정할 부분과 미리 정할 부분을 나눠보세요."
+  ],
+  [
+    "양가와 편안한 거리",
+    "가족과의 연락이나 방문에서 편한 점과 부담스러운 점을 말해보세요. 두 사람 모두 감당할 수 있는 연락·방문 기준 하나를 정해보세요."
+  ],
+  [
+    "집안일의 무게 나누기",
+    "집안일이나 돌봄 중 요즘 가장 버거운 일을 하나씩 말해보세요. 개수뿐 아니라 시간과 피로를 고려해 이번 주 역할 하나를 조정해보세요."
+  ],
+  [
+    "다툰 뒤 다시 만날 시간",
+    "바로 이야기해야 편한지, 진정할 시간이 필요한지 이유를 나눠보세요. 쉬어가자는 말과 대화를 다시 시작할 시간을 함께 정해보세요."
+  ],
+  [
+    "화가 날 때 필요한 것",
+    "화가 났을 때 도움이 되는 행동과 더 힘들게 하는 행동을 하나씩 말해보세요. 다음 갈등에서 서로 지켜줄 행동 하나를 골라보세요."
+  ],
+  [
+    "아이에게 지켜주고 싶은 기준",
+    "아이를 키우거나 키울 계획이 있다면 꼭 지킬 규칙과 아이에게 맡길 선택을 하나씩 나눠보세요. 의견이 다른 상황 하나의 대응을 함께 정해보세요. 해당하지 않으면 건너뛰어도 좋아요."
+  ],
+  [
+    "슬픈 날 곁에 있는 방법",
+    "슬플 때 혼자 있고 싶은지, 이야기를 들어주면 좋은지 말해보세요. 다음에 서로의 상태를 확인할 짧은 질문 하나를 정해보세요."
+  ],
+  [
+    "집과 밖, 주말의 균형",
+    "주말에 집에서 하고 싶은 일과 밖에서 하고 싶은 일을 골라보세요. 각자의 휴식이 들어가는 반나절 일정을 함께 만들어보세요."
+  ],
+  [
+    "기운을 채우는 시간",
+    "사람을 만날 때와 혼자 취미를 즐길 때 어떤 기운을 얻는지 나눠보세요. 이번 주에 서로의 충전 시간을 하나씩 확보해보세요."
+  ],
+  [
+    "함께 정할 일, 맡길 일",
+    "최근 결정 하나를 떠올려 각자의 의견이 충분히 반영됐는지 말해보세요. 함께 정할 일과 한 사람에게 맡겨도 편한 일을 구분해보세요."
+  ],
+  [
+    "일과 집의 경계",
+    "일 때문에 양보하기 어려운 시간과 함께 지키고 싶은 시간을 나눠보세요. 바쁜 날 미리 알리는 방법과 지킬 약속 하나를 정해보세요."
+  ],
+  [
+    "유독 귀찮은 일 하나",
+    "남들에겐 쉬워 보여도 자신에게 유독 번거로운 일을 하나씩 말해보세요. 서로 바꿔 맡거나 절차를 줄일 방법 하나를 찾아보세요."
+  ],
+  [
+    "우리의 에너지 시간표",
+    "아침·오후·저녁 중 기운이 나는 시간과 지치는 시간을 말해보세요. 중요한 대화나 집안일 하나를 두 사람에게 덜 버거운 시간으로 옮겨보세요."
+  ],
+  [
+    "바로 하기와 미뤄두기",
+    "일을 바로 처리하거나 잠시 두는 이유를 나눠보세요. 미뤄둔 일 하나를 골라 언제까지 할지, 언제 다시 확인할지 함께 정해보세요."
+  ]
+];
+
+const conversationMissions: Mission[] = conversationTopics.map(([title, prompt], index) => ({
+  id: `m${index + 11}`,
+  title,
+  prompt,
+  difficulty: "10분",
+  completions: 0,
+  participated: false,
+  reflections: [],
+}));
 
 export const missions: Mission[] = [
   {
@@ -240,6 +345,9 @@ export const missions: Mission[] = [
     reflections: [],
   },
 ];
+
+// Keep existing mission IDs and their participation history stable.
+missions.push(...conversationMissions);
 
 export function dailyMissionSelection(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {

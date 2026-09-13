@@ -42,12 +42,16 @@ import {
   anonymousCommentAliasCount,
 } from "@/lib/anonymous-comment-alias";
 import { dailyMissionSelection, missions } from "@/lib/community-data";
+import { isAdminEmail } from "@/lib/admin-access";
 import { prisma } from "@/lib/db";
 import { formatMarriageYear, parseMarriageYear } from "@/lib/marriage-persona";
 import { normalizePersonaValue } from "@/lib/persona";
+import { PostCooldownError, postRetryAfterSeconds } from "@/lib/post-rate-limit";
 
 type AuthorSummary = {
   name: string | null;
+  email: string | null;
+  role: string;
   nickname: string | null;
   personas: Array<{
     id: string;
@@ -80,6 +84,8 @@ type PostWithRelations = PostModel & {
 
 const authorSelect = {
   name: true,
+  email: true,
+  role: true,
   nickname: true,
   personas: {
     select: {
@@ -174,7 +180,11 @@ type LetterWithReactions = AnonymousLetterModel & {
   reactions: LetterReactionModel[];
 };
 
-export async function listCommunityPosts(userId?: string, anonKey?: string) {
+export async function listCommunityPosts(
+  userId?: string,
+  anonKey?: string,
+  viewerIsAdmin = false,
+) {
   const posts = await prisma.post.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -193,13 +203,16 @@ export async function listCommunityPosts(userId?: string, anonKey?: string) {
     take: 50,
   });
 
-  return posts.map((post) => toCommunityPost(post, userId, anonKey));
+  return posts.map((post) =>
+    toCommunityPost(post, userId, anonKey, viewerIsAdmin),
+  );
 }
 
 export async function getCommunityPostByPublicId(
   publicId: number,
   userId?: string,
   anonKey?: string,
+  viewerIsAdmin = false,
 ) {
   if (!Number.isSafeInteger(publicId) || publicId < 1) return null;
 
@@ -220,7 +233,9 @@ export async function getCommunityPostByPublicId(
     },
   });
 
-  return post ? toCommunityPost(post, userId, anonKey) : null;
+  return post
+    ? toCommunityPost(post, userId, anonKey, viewerIsAdmin)
+    : null;
 }
 
 export async function getCommunityPostSeoByPublicId(publicId: number) {
@@ -299,6 +314,7 @@ export async function listCommunityFeedPosts(limit = 50) {
 }
 
 export async function createCommunityPost(input: {
+  ipHash: string;
   category: keyof typeof categoryToDb;
   title: string;
   body: string;
@@ -334,41 +350,61 @@ export async function createCommunityPost(input: {
     author?.personas ?? [],
   );
 
-  const post = await prisma.post.create({
-    data: {
-      category: categoryToDb[input.category],
-      title: input.title,
-      body: input.body,
-      authorId: input.userId,
-      authorName: isAnonymous
-        ? "익명의 부부"
-        : author?.nickname ?? author?.name ?? "부부라이프 회원",
-      coupleStage: "새 이야기",
-      mood: moodFromTemperature(input.temperature),
-      temperature: input.temperature,
-      readMinutes: Math.max(1, Math.ceil(input.body.length / 180)),
-      tags: input.tags.length > 0 ? input.tags : ["새글"],
-      isAnonymous,
-      showAuthorGender: authorPersonaSnapshots.some(
-        (persona) => persona.type === "GENDER",
-      ),
-      authorPersonaSnapshots,
-      showCommenterGender: commentPersonaRequests.some(
-        (request) => request.type === "GENDER",
-      ),
-      commentPersonaRequests,
-    },
-    include: {
-      author: { select: authorSelect },
-      comments: {
-        include: {
-          author: { select: authorSelect },
-          reactions: true,
-        },
+  const post = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      DELETE FROM "PostRateLimit" WHERE "lastPostedAt" < CURRENT_TIMESTAMP - INTERVAL '1 day'
+    `;
+    const accepted = await tx.$queryRaw<Array<{ accepted: number }>>`
+      INSERT INTO "PostRateLimit" ("ipHash", "lastPostedAt")
+      VALUES (${input.ipHash}, CURRENT_TIMESTAMP)
+      ON CONFLICT ("ipHash") DO UPDATE
+      SET "lastPostedAt" = EXCLUDED."lastPostedAt"
+      WHERE "PostRateLimit"."lastPostedAt" <= CURRENT_TIMESTAMP - INTERVAL '3 minutes'
+      RETURNING 1 AS accepted
+    `;
+    if (accepted.length === 0) {
+      const [previous] = await tx.$queryRaw<Array<{ lastPostedAt: Date }>>`
+        SELECT "lastPostedAt" FROM "PostRateLimit" WHERE "ipHash" = ${input.ipHash}
+      `;
+      throw new PostCooldownError(previous ? postRetryAfterSeconds(previous.lastPostedAt) : 180);
+    }
+    const created = await tx.post.create({
+      data: {
+        category: categoryToDb[input.category],
+        title: input.title,
+        body: input.body,
+        authorId: input.userId,
+        authorName: isAnonymous
+          ? "익명의 부부"
+          : author?.nickname ?? author?.name ?? "부부라이프 회원",
+        coupleStage: "새 이야기",
+        mood: moodFromTemperature(input.temperature),
+        temperature: input.temperature,
+        readMinutes: Math.max(1, Math.ceil(input.body.length / 180)),
+        tags: input.tags.length > 0 ? input.tags : ["새글"],
+        isAnonymous,
+        showAuthorGender: authorPersonaSnapshots.some(
+          (persona) => persona.type === "GENDER",
+        ),
+        authorPersonaSnapshots,
+        showCommenterGender: commentPersonaRequests.some(
+          (request) => request.type === "GENDER",
+        ),
+        commentPersonaRequests,
       },
-      reactions: true,
-      verdictVotes: true,
-    },
+      include: {
+        author: { select: authorSelect },
+        comments: {
+          include: {
+            author: { select: authorSelect },
+            reactions: true,
+          },
+        },
+        reactions: true,
+        verdictVotes: true,
+      },
+    });
+    return created;
   });
 
   return toCommunityPost(post);
@@ -382,6 +418,7 @@ export async function createCommunityComment(input: {
   anonKey?: string;
   isAnonymous: boolean;
   personaDisclosures: CommentPersonaDisclosure[];
+  viewerIsAdmin?: boolean;
 }) {
   const cooldownStartedAt = new Date(Date.now() - 10_000);
   const recentComment = await prisma.comment.findFirst({
@@ -513,7 +550,13 @@ export async function createCommunityComment(input: {
     });
   });
 
-  return toCommunityComment(comment, input.userId, input.anonKey);
+  return toCommunityComment(
+    comment,
+    input.userId,
+    input.anonKey,
+    undefined,
+    input.viewerIsAdmin,
+  );
 }
 
 export class CommentCooldownError extends Error {
@@ -532,6 +575,7 @@ export async function updateCommunityCommentPersonas(input: {
   personaDisclosures: CommentPersonaDisclosure[];
   userId?: string;
   anonKey?: string;
+  viewerIsAdmin?: boolean;
 }) {
   const comment = await prisma.$transaction(async (transaction) => {
     // Serialize updates so two disclosure saves cannot overwrite one another.
@@ -564,7 +608,13 @@ export async function updateCommunityCommentPersonas(input: {
       include: { author: { select: authorSelect }, reactions: true },
     });
   });
-  return toCommunityComment(comment, input.userId, input.anonKey);
+  return toCommunityComment(
+    comment,
+    input.userId,
+    input.anonKey,
+    undefined,
+    input.viewerIsAdmin,
+  );
 }
 
 export async function updateCommunityComment(input: {
@@ -572,6 +622,7 @@ export async function updateCommunityComment(input: {
   body: string;
   userId?: string;
   anonKey?: string;
+  viewerIsAdmin?: boolean;
 }) {
   const existing = await findCommentForManagement(input.commentId);
   assertCommentOwner(existing, input.userId, input.anonKey);
@@ -585,7 +636,13 @@ export async function updateCommunityComment(input: {
     },
   });
 
-  return toCommunityComment(comment, input.userId, input.anonKey);
+  return toCommunityComment(
+    comment,
+    input.userId,
+    input.anonKey,
+    undefined,
+    input.viewerIsAdmin,
+  );
 }
 
 export async function deleteCommunityComment(input: {
@@ -752,6 +809,14 @@ export async function createCommunityVerdictVote(input: {
   return { verdicts, myVerdict: input.choice };
 }
 
+async function ensureMissionRecord(mission: (typeof missions)[number]) {
+  return prisma.mission.upsert({
+    where: { id: mission.id },
+    create: { id: mission.id, title: mission.title, prompt: mission.prompt, difficulty: mission.difficulty },
+    update: {},
+  });
+}
+
 export async function completeCommunityMission(input: {
   missionId: string;
   userId: string;
@@ -760,6 +825,7 @@ export async function completeCommunityMission(input: {
   const missionId = mission.id;
   if (input.missionId !== missionId) return null;
 
+  await ensureMissionRecord(mission);
   await prisma.missionCompletion.upsert({
     where: {
       missionId_userId_completedOn: {
@@ -788,6 +854,7 @@ export async function createCommunityMissionReflection(input: {
   const missionId = mission.id;
   if (input.missionId !== missionId) return null;
 
+  await ensureMissionRecord(mission);
   await prisma.missionReflection.create({
     data: {
       missionId,
@@ -981,6 +1048,7 @@ function toCommunityPost(
   post: PostWithRelations,
   currentUserId?: string,
   currentAnonKey?: string,
+  viewerIsAdmin = false,
 ): CommunityPost {
   const ownVerdict = currentUserId
     ? post.verdictVotes.find((vote) => vote.userId === currentUserId)
@@ -995,6 +1063,7 @@ function toCommunityPost(
   return {
     id: post.id,
     publicId: post.publicId,
+    ...(viewerIsAdmin ? { adminHasMemberAuthor: Boolean(post.authorId && post.author && post.author.role !== "ADMIN" && !isAdminEmail(post.author.email)) } : {}),
     category: categoryFromDb[post.category],
     title: post.title,
     body: post.body,
@@ -1023,6 +1092,7 @@ function toCommunityPost(
         currentUserId,
         currentAnonKey,
         comment.anonymousAlias ?? fallbackAnonymousAliases.get(comment.id),
+        viewerIsAdmin,
       ),
     ),
     ...summarizePostReactions(post.reactions, currentUserId),
@@ -1094,6 +1164,7 @@ function toCommunityComment(
   currentUserId?: string,
   currentAnonKey?: string,
   resolvedAnonymousAlias?: string,
+  viewerIsAdmin = false,
 ) {
   const actorKey = commentActorKey(currentUserId, currentAnonKey);
   const personas = normalizeCommentPersonaSnapshots(comment.personaSnapshots);
@@ -1109,6 +1180,7 @@ function toCommunityComment(
         anonymousCommentAlias(`${comment.postId}:comment:${comment.id}`)
       : comment.author?.nickname ?? comment.author?.name ?? comment.authorName,
     isAnonymous: comment.isAnonymous,
+    isGuest: !comment.authorId && !isAiOperatorComment(comment),
     authorGender,
     personas,
     authorVerifiedPersonaCount: comment.isAnonymous
@@ -1125,7 +1197,25 @@ function toCommunityComment(
       ? { pendingPersonaTypes: comment.pendingPersonaTypes.filter(isCommentPersonaType) }
       : {}),
     ...summarizeCommentReactions(comment.reactions, actorKey),
+    ...(viewerIsAdmin
+      ? { adminAuthorKind: adminCommentAuthorKind(comment) }
+      : {}),
   };
+}
+
+function adminCommentAuthorKind(comment: CommentWithAuthor) {
+  if (isAiOperatorComment(comment)) return "ai" as const;
+  if (isAdminEmail(comment.author?.email)) return "admin" as const;
+  return comment.authorId ? ("member" as const) : ("visitor" as const);
+}
+
+function isAiOperatorComment(comment: CommentWithAuthor) {
+  return (
+    comment.authorName === "운영자A" ||
+    comment.authorName === "운영자I" ||
+    comment.authorName === "부부라이프 AI 운영자" ||
+    comment.id.startsWith("booboolife-ai-")
+  );
 }
 
 function assignFallbackAnonymousAliases(comments: AnonymousAliasSource[]) {

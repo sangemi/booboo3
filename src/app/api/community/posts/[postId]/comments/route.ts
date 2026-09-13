@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { createCommentSchema } from "@/lib/community-schema";
+import { isAdminEmail } from "@/lib/admin-access";
 import {
   CommentCooldownError,
   createCommunityComment,
@@ -39,6 +40,7 @@ export async function POST(
       userId: session?.user?.id,
       anonKey,
       personaDisclosures: parsed.data.personaDisclosures,
+      viewerIsAdmin: isAdminEmail(session?.user?.email),
     });
     const response = NextResponse.json(
       { comment, source: "database" },

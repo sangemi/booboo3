@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { CommentPersonaLayer } from "@/components/booboo/comment-persona-layer";
+import { PostModerationControls } from "@/components/booboo/post-moderation-controls";
 import { VerifiedName } from "@/components/booboo/verified-name";
 import {
   AuthorPersonaPicker,
@@ -74,6 +75,16 @@ const goalMessages = [
   "더 다정하게 살고, 더 건강하게 다투기",
   "다른 보통 부부는 어떻게 살아갈까요?",
 ] as const;
+
+const adminCommentAuthorLabels: Record<
+  NonNullable<CommentItem["adminAuthorKind"]>,
+  string
+> = {
+  admin: "관리자",
+  member: "회원",
+  visitor: "비회원",
+  ai: "AI 운영",
+};
 
 type BoobooAppProps = {
   initialPost?: CommunityPost;
@@ -225,8 +236,16 @@ export function BoobooApp({
     loadLetters();
     loadTodayMission();
 
+    const refreshMission = () => {
+      if (document.visibilityState === "visible") loadTodayMission();
+    };
+    const missionTimer = window.setInterval(refreshMission, 60_000);
+    document.addEventListener("visibilitychange", refreshMission);
+
     return () => {
       active = false;
+      window.clearInterval(missionTimer);
+      document.removeEventListener("visibilitychange", refreshMission);
     };
   }, [initialPost]);
 
@@ -381,6 +400,12 @@ export function BoobooApp({
     return category === "all" ? "/" : `/?category=${category}`;
   }
 
+  function onPostModerated(postId: string) {
+    setPosts((current) => current.filter((post) => post.id !== postId));
+    setMobileDetailOpen(false);
+    router.replace(homeHref(activeCategory));
+  }
+
   function selectCategory(category: CategoryKey) {
     setActiveCategory(category);
     if (!initialPost) {
@@ -476,6 +501,12 @@ export function BoobooApp({
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          const result = (await response.json()) as { retryAfterSeconds?: number };
+          const minutes = Math.ceil((result.retryAfterSeconds ?? 180) / 60);
+          setPostSubmitError(`같은 IP에서는 3분에 글을 하나만 올릴 수 있습니다. ${minutes}분 뒤 다시 시도해 주세요.`);
+          return;
+        }
         setPostSubmitError("글을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
@@ -1174,6 +1205,9 @@ export function BoobooApp({
                   ))}
                 </div>
 
+                {canReadViews ? (
+                  <PostModerationControls postId={selectedPost.id} postTitle={selectedPost.title} canSuspend={selectedPost.adminHasMemberAuthor === true} onModerated={() => onPostModerated(selectedPost.id)} />
+                ) : null}
                 <div className="opacity-60 transition-opacity duration-200 hover:opacity-90 focus-within:opacity-100">
                   <PostActions
                     post={selectedPost}
@@ -1296,6 +1330,9 @@ export function BoobooApp({
                 {todayMission.difficulty} · {todayMission.completions}명 참여
               </p>
             </button>
+            <div className="mt-2 text-right">
+              <Link href="/missions" className="text-xs text-[var(--ink-soft)] hover:text-[var(--plum)] hover:underline">과거 미션 보기</Link>
+            </div>
           </section>
 
           <section className="rounded-[8px] border border-[#eee5cc] bg-[#fffaf0] p-4">
@@ -1495,6 +1532,8 @@ export function BoobooApp({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
             <MobilePostDetail
               post={selectedPost}
+              canModerate={canReadViews}
+              onModerated={() => onPostModerated(selectedPost.id)}
               adminViewCount={canReadViews ? adminViewCounts[selectedPost.publicId] : undefined}
               commentDraft={commentDrafts[selectedPost.id] ?? ""}
               commentError={commentSubmitErrors[selectedPost.id] ?? ""}
@@ -1783,7 +1822,7 @@ function CommentCard({
   const layerRequests = pendingRequests.length > 0 ? pendingRequests : optionalRequests;
 
   return (
-    <div>
+    <div className="relative">
     <div
       id={`comment-${comment.id}`}
       className={cn("rounded-[8px] p-3", comment.isPublished === false ? "bg-[#f1f1f1] text-[#777]" : "bg-[#fbf6f0]")}
@@ -1804,6 +1843,14 @@ function CommentCard({
             />
           </span>
           <CommentPersonaBadges comment={comment} />
+          {comment.isGuest && comment.adminAuthorKind !== "visitor" ? (
+            <span className="text-[11px] font-medium text-[#5f5853]">(비회원)</span>
+          ) : null}
+          {comment.adminAuthorKind ? (
+            <span className="text-[10px] text-[var(--ink-soft)]">
+              (관.{adminCommentAuthorLabels[comment.adminAuthorKind]})
+            </span>
+          ) : null}
           {comment.isPublished === false ? (
             <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#e5e5e5] px-1.5 py-0.5 text-[10px] text-[#666]">
               <Lock className="size-3" aria-hidden="true" />
@@ -1956,13 +2003,15 @@ function CommentCard({
       ) : null}
     </div>
     {comment.canManage && layerRequests.length > 0 ? (
-      <CommentPersonaLayer
-        key={layerRequests.map((request) => request.type + request.level).join("-")}
-        requests={layerRequests}
-        signedIn={signedIn}
-        onSave={onSavePersonas}
-        onDismiss={onDismissPersonaPrompt}
-      />
+      <div className={pendingRequests.length === 0 ? "absolute right-0 top-full z-30 w-[min(24rem,calc(100vw-2rem))]" : ""}>
+        <CommentPersonaLayer
+          key={layerRequests.map((request) => request.type + request.level).join("-")}
+          requests={layerRequests}
+          signedIn={signedIn}
+          onSave={onSavePersonas}
+          onDismiss={onDismissPersonaPrompt}
+        />
+      </div>
     ) : null}
     </div>
   );
@@ -1970,6 +2019,8 @@ function CommentCard({
 
 function MobilePostDetail({
   adminViewCount,
+  canModerate,
+  onModerated,
   post,
   commentPending,
   personaPromptIds,
@@ -1991,6 +2042,8 @@ function MobilePostDetail({
 }: {
   post: CommunityPost;
   adminViewCount?: number;
+  canModerate: boolean;
+  onModerated: () => void;
   commentPending: boolean;
   personaPromptIds: string[];
   onDismissPersonaPrompt: (commentId: string) => void;
@@ -2049,6 +2102,9 @@ function MobilePostDetail({
         ))}
       </div>
 
+      {canModerate ? (
+        <PostModerationControls postId={post.id} postTitle={post.title} canSuspend={post.adminHasMemberAuthor === true} onModerated={onModerated} />
+      ) : null}
       <div className="opacity-60 transition-opacity duration-200 focus-within:opacity-100">
         <PostActions post={post} onReact={onReact} />
       </div>

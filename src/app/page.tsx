@@ -15,6 +15,7 @@ import {
   listCommunityPosts,
 } from "@/lib/community-service";
 import { SITE_DESCRIPTION } from "@/lib/seo";
+import { isAdminEmail } from "@/lib/admin-access";
 
 export const metadata: Metadata = {
   title: { absolute: "부부라이프 | 우리 부부 이야기" },
@@ -41,6 +42,7 @@ export default async function Home({ searchParams }: HomePageProps) {
     listCommunityPosts(
       session?.user?.id,
       cookieStore.get("booboo_anon_id")?.value,
+      isAdminEmail(session?.user?.email),
     ).catch(() => seedPosts),
     listAnonymousLetters(cookieStore.get("booboo_anon_id")?.value).catch(
       () => seedLetters,

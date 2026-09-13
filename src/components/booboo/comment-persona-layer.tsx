@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, X } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { PersonaValueField, type ProfilePersonaOption } from "./comment-persona-controls";
 import {
@@ -23,6 +23,7 @@ export function CommentPersonaLayer({
   onDismiss: () => void;
 }) {
   const labelId = useId();
+  const layerRef = useRef<HTMLElement>(null);
   const [personas, setPersonas] = useState<ProfilePersonaOption[]>([]);
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [values, setValues] = useState<Record<string, string>>({});
@@ -41,6 +42,15 @@ export function CommentPersonaLayer({
       .catch(() => undefined);
     return () => { active = false; };
   }, [signedIn]);
+
+  useEffect(() => {
+    if (required) return;
+    function dismissOnOutsideClick(event: PointerEvent) {
+      if (event.target instanceof Node && !layerRef.current?.contains(event.target)) onDismiss();
+    }
+    document.addEventListener("pointerdown", dismissOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", dismissOnOutsideClick);
+  }, [required, onDismiss]);
 
   function choiceFor(type: CommentPersonaRequest["type"]) {
     const options = personas.filter((persona) => persona.type === type);
@@ -70,6 +80,7 @@ export function CommentPersonaLayer({
   if (requests.length === 0) return null;
   return (
     <aside
+      ref={layerRef}
       role={required ? "region" : "dialog"}
       aria-modal={required ? undefined : false}
       aria-labelledby={labelId}

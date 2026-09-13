@@ -81,6 +81,7 @@ test("관리자 그래프는 최근 14일 회원가입과 고유 방문자를 �
 test("선택 정보 없이 즉시 공개하고, 동의한 댓글에만 정보를 추가한다", async () => {
   const comment = await create(optionalPostId, "optional-owner");
   assert.equal(comment.isPublished, true);
+  assert.equal(comment.isGuest, true);
   assert.deepEqual(comment.personas, []);
   assert.equal(comment.body, "첫 번째 줄\n두 번째 줄");
   const updated = await service.updateCommunityCommentPersonas({
@@ -145,6 +146,7 @@ test("회원의 저장된 필수 정보는 자동 선택하지만 선택 정보�
   const optionalComment = await service.createCommunityComment({
     postId: optionalPostId, userId: optional.id, isAnonymous: true, body: "프로필 공개와 댓글 공개는 별개", tone: "support", personaDisclosures: [],
   });
+  assert.equal(optionalComment.isGuest, false);
   assert.deepEqual(optionalComment.personas, []);
   await assert.rejects(service.updateCommunityCommentPersonas({
     commentId: optionalComment.id, userId: optional.id, personaDisclosures: [{ type: "GENDER", personaId: gender.id }],

@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, Gift, MoreHorizontal, X } from "lucide-react";
+import { Banknote, Gift, MoreHorizontal, UserCheck, X } from "lucide-react";
 import { useState } from "react";
 
 type UserRow = {
@@ -30,6 +30,7 @@ export function AdminUserTable({ users }: { users: UserRow[] }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [messageError, setMessageError] = useState(false);
 
   function openGrant(user: UserRow, asset: "CASH" | "POINT") {
     setOpenMenuId(null);
@@ -85,6 +86,7 @@ export function AdminUserTable({ users }: { users: UserRow[] }) {
       setMessage(
         `${displayName(grant.user)}님에게 ${assetLabel(grant.asset)} ${parsedAmount.toLocaleString()}을 지급했습니다.`,
       );
+      setMessageError(false);
       setGrant(null);
     } catch {
       setError("네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
@@ -93,10 +95,30 @@ export function AdminUserTable({ users }: { users: UserRow[] }) {
     }
   }
 
+  async function resumeMember(user: UserRow) {
+    setOpenMenuId(null);
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/suspension`, { method: "DELETE" });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setMessage(data.error ?? "정지를 해제하지 못했습니다.");
+        setMessageError(true);
+        return;
+      }
+      setRows((current) => current.map((row) => row.id === user.id ? { ...row, role: "MEMBER" } : row));
+      setMessage(`${displayName(user)}님의 계정 정지를 해제했습니다.`);
+      setMessageError(false);
+    } catch {
+      setMessage("연결을 확인한 뒤 다시 시도해 주세요.");
+      setMessageError(true);
+    }
+  }
+
   return (
     <>
       {message ? (
-        <p className="mt-5 rounded-[6px] border border-[#cfe1d4] bg-[#edf6ef] px-3 py-2 text-sm text-[#356447]">
+        <p role={messageError ? "alert" : undefined} className={messageError ? "mt-5 rounded-[6px] border border-[#f0c9c5] bg-[#fff0ed] px-3 py-2 text-sm text-[#a33c32]" : "mt-5 rounded-[6px] border border-[#cfe1d4] bg-[#edf6ef] px-3 py-2 text-sm text-[#356447]"}>
           {message}
         </p>
       ) : null}
@@ -125,6 +147,7 @@ export function AdminUserTable({ users }: { users: UserRow[] }) {
                       <div className="flex items-center gap-2">
                         <p className="max-w-40 truncate font-bold">{displayName(user)}</p>
                         {user.role === "ADMIN" ? <span className="rounded bg-[#302c2e] px-1.5 py-0.5 text-[10px] font-bold text-white">관리자</span> : null}
+                        {user.role === "SUSPENDED" ? <span className="rounded bg-[#a33c32] px-1.5 py-0.5 text-[10px] font-bold text-white">이용 정지</span> : null}
                       </div>
                       <p className="mt-0.5 max-w-64 truncate text-xs text-[#817a75]">{user.email ?? "이메일 없음"} · {providerLabel(user.provider)}</p>
                     </div>
@@ -154,6 +177,11 @@ export function AdminUserTable({ users }: { users: UserRow[] }) {
                       <button type="button" onClick={() => openGrant(user, "POINT")} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-[#f4f1ee]">
                         <Gift className="size-4 text-[#5f8a70]" /> 포인트 지급
                       </button>
+                      {user.role === "SUSPENDED" ? (
+                        <button type="button" onClick={() => resumeMember(user)} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-[#f4f1ee]">
+                          <UserCheck className="size-4 text-[#5f8a70]" /> 정지 해제
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </td>

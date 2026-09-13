@@ -31,7 +31,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const user = await prisma.user.findUnique({ where: { email } });
 
-        if (!user?.passwordHash) return null;
+        if (!user?.passwordHash || user.role === "SUSPENDED") return null;
         if (!(await bcrypt.compare(password, user.passwordHash))) return null;
 
         return {
@@ -64,6 +64,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     error: "/login",
   },
   callbacks: {
+    async signIn({ user, account }) {
+      const linkedAccount = account
+        ? await prisma.account.findUnique({
+            where: { provider_providerAccountId: { provider: account.provider, providerAccountId: account.providerAccountId } },
+            select: { user: { select: { role: true } } },
+          })
+        : null;
+      const existing = linkedAccount?.user
+        ?? (user.id ? await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } }) : null)
+        ?? (user.email ? await prisma.user.findUnique({ where: { email: user.email.toLowerCase() }, select: { role: true } }) : null);
+      return existing?.role !== "SUSPENDED";
+    },
     async jwt({ token, user }) {
       if (user?.id) token.sub = user.id;
 
@@ -84,13 +96,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
         });
 
-        if (profile) {
-          token.name = profile.nickname ?? profile.name;
-          token.email = profile.email;
-          token.picture = profile.image;
-          token.isAdmin = isAdminEmail(profile.email);
-          token.verifiedPersonaCount = profile._count.personas;
-        }
+        if (!profile || profile.role === "SUSPENDED") return null;
+        token.name = profile.nickname ?? profile.name;
+        token.email = profile.email;
+        token.picture = profile.image;
+        token.isAdmin = isAdminEmail(profile.email);
+        token.verifiedPersonaCount = profile._count.personas;
       }
 
       return token;

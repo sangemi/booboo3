@@ -274,6 +274,13 @@ model PostView {
   @@index([postId])
 }
 
+model PostRateLimit {
+  ipHash       String   @id
+  lastPostedAt DateTime
+
+  @@index([lastPostedAt])
+}
+
 model SiteVisit {
   id        String   @id
   createdAt DateTime @default(now())

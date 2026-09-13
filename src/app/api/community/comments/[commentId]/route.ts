@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { updateCommentSchema } from "@/lib/community-schema";
+import { isAdminEmail } from "@/lib/admin-access";
 import {
   CommentNotFoundError,
   CommentPermissionError,
@@ -33,6 +34,7 @@ export async function PATCH(
       body: parsed.data.body,
       userId: session?.user?.id,
       anonKey: request.cookies.get(ANON_COOKIE)?.value,
+      viewerIsAdmin: isAdminEmail(session?.user?.email),
     });
     return NextResponse.json({ comment, source: "database" });
   } catch (error) {

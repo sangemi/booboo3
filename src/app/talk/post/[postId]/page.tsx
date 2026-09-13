@@ -25,6 +25,7 @@ import {
   type LegacyTalkSearchParams,
 } from "@/lib/legacy-talk";
 import { SITE_NAME, SITE_URL, postUrl, seoDescription } from "@/lib/seo";
+import { isAdminEmail } from "@/lib/admin-access";
 
 type PostPageProps = {
   params: Promise<{ postId: string }>;
@@ -80,10 +81,12 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
       Number(postId),
       session?.user?.id,
       cookieStore.get("booboo_anon_id")?.value,
+      isAdminEmail(session?.user?.email),
     ),
     listCommunityPosts(
       session?.user?.id,
       cookieStore.get("booboo_anon_id")?.value,
+      isAdminEmail(session?.user?.email),
     ).catch(() => seedPosts),
     listAnonymousLetters(cookieStore.get("booboo_anon_id")?.value).catch(
       () => seedLetters,
