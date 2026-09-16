@@ -35,6 +35,7 @@ import {
   categories,
   categoryLabels,
   CategoryKey,
+  COMMUNITY_POST_PAGE_SIZE,
   CommentItem,
   CommunityPost,
   dailyMissionSelection,
@@ -89,6 +90,8 @@ const adminCommentAuthorLabels: Record<
 type BoobooAppProps = {
   initialPost?: CommunityPost;
   initialPosts?: CommunityPost[];
+  initialPostListPage?: number;
+  initialPostListTotal?: number;
   initialLetters?: Letter[];
   initialMission?: Mission;
   initialCategory?: CategoryKey;
@@ -97,6 +100,8 @@ type BoobooAppProps = {
 export function BoobooApp({
   initialPost,
   initialPosts,
+  initialPostListPage = 1,
+  initialPostListTotal,
   initialLetters,
   initialMission,
   initialCategory,
@@ -111,6 +116,10 @@ export function BoobooApp({
       : initialPost
         ? [initialPost, ...seedPosts.filter((post) => post.id !== initialPost.id)]
         : seedPosts,
+  );
+  const [postPage, setPostPage] = useState(initialPostListPage);
+  const [postTotal, setPostTotal] = useState(
+    initialPostListTotal ?? initialPosts?.length ?? seedPosts.length,
   );
   const [activeCategory, setActiveCategory] = useState<CategoryKey>(
     initialCategory ?? "all",
@@ -175,13 +184,19 @@ export function BoobooApp({
 
     async function loadPosts() {
       try {
-        const response = await fetch("/api/community/posts", {
+        const params = new URLSearchParams({ page: String(initialPostListPage) });
+        if (initialCategory && initialCategory !== "all") {
+          params.set("category", initialCategory);
+        }
+        const response = await fetch(`/api/community/posts?${params.toString()}`, {
           cache: "no-store",
         });
         if (!response.ok) return;
 
         const payload = (await response.json()) as {
           posts?: CommunityPost[];
+          page?: number;
+          total?: number;
           source?: "seed" | "database";
         };
 
@@ -192,6 +207,8 @@ export function BoobooApp({
             ? [initialPost, ...payload.posts]
             : payload.posts;
         setPosts(nextPosts);
+        setPostPage(payload.page ?? initialPostListPage);
+        setPostTotal(payload.total ?? nextPosts.length);
         const requestedPost = initialPost
           ? nextPosts.find((post) => post.publicId === initialPost.publicId)
           : undefined;
@@ -247,7 +264,7 @@ export function BoobooApp({
       window.clearInterval(missionTimer);
       document.removeEventListener("visibilitychange", refreshMission);
     };
-  }, [initialPost]);
+  }, [initialCategory, initialPost, initialPostListPage]);
 
   const filteredPosts = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -303,6 +320,10 @@ export function BoobooApp({
   const canGoPrevious = selectedPostIndex > 0;
   const canGoNext =
     selectedPostIndex >= 0 && selectedPostIndex < filteredPosts.length - 1;
+  const postTotalPages = Math.max(
+    1,
+    Math.ceil(postTotal / COMMUNITY_POST_PAGE_SIZE),
+  );
 
   useEffect(() => {
     if (!mobileDetailOpen || !window.matchMedia("(max-width: 1279px)").matches) {
@@ -390,20 +411,36 @@ export function BoobooApp({
     setMobileDetailOpen(true);
   }
 
-  function postHref(publicId: number) {
-    const categoryQuery =
-      activeCategory === "all" ? "" : `?category=${activeCategory}`;
-    return `/talk/post/${publicId}${categoryQuery}`;
+  function listPageHref(page: number) {
+    const params = new URLSearchParams();
+    if (activeCategory !== "all") params.set("category", activeCategory);
+    if (page > 1) params.set("page", String(page));
+    const query = params.toString();
+    return initialPost
+      ? `/talk/post/${initialPost.publicId}${query ? `?${query}` : ""}`
+      : `/${query ? `?${query}` : ""}`;
   }
 
-  function homeHref(category: CategoryKey) {
-    return category === "all" ? "/" : `/?category=${category}`;
+  function postHref(publicId: number) {
+    const params = new URLSearchParams();
+    if (activeCategory !== "all") params.set("category", activeCategory);
+    if (postPage > 1) params.set("page", String(postPage));
+    const query = params.toString();
+    return `/talk/post/${publicId}${query ? `?${query}` : ""}`;
+  }
+
+  function homeHref(category: CategoryKey, page = 1) {
+    const params = new URLSearchParams();
+    if (category !== "all") params.set("category", category);
+    if (page > 1) params.set("page", String(page));
+    const query = params.toString();
+    return `/${query ? `?${query}` : ""}`;
   }
 
   function onPostModerated(postId: string) {
     setPosts((current) => current.filter((post) => post.id !== postId));
     setMobileDetailOpen(false);
-    router.replace(homeHref(activeCategory));
+    router.replace(homeHref(activeCategory, postPage));
   }
 
   function selectCategory(category: CategoryKey) {
@@ -1164,10 +1201,48 @@ export function BoobooApp({
                   </Link>
                 );
               })}
+              {postTotalPages > 1 ? (
+                <nav
+                  className="flex items-center justify-center gap-3 border-t border-[#eee7e1] px-3 py-3"
+                  aria-label="게시글 목록 페이지"
+                >
+                  <Link
+                    href={postPage > 1 ? listPageHref(postPage - 1) : "#"}
+                    aria-label="이전 글 목록"
+                    aria-disabled={postPage <= 1}
+                    title="이전 글 목록"
+                    className={cn(
+                      "grid size-8 place-items-center rounded-[6px] border border-[var(--line)] bg-white text-[var(--ink-soft)] transition hover:bg-[#faf6f2] hover:text-[var(--foreground)]",
+                      postPage <= 1 && "pointer-events-none opacity-35",
+                    )}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden="true" />
+                  </Link>
+                  <span className="min-w-14 text-center text-xs font-bold text-[var(--ink-soft)]">
+                    {postPage} / {postTotalPages}
+                  </span>
+                  <Link
+                    href={
+                      postPage < postTotalPages
+                        ? listPageHref(postPage + 1)
+                        : "#"
+                    }
+                    aria-label="다음 글 목록"
+                    aria-disabled={postPage >= postTotalPages}
+                    title="다음 글 목록"
+                    className={cn(
+                      "grid size-8 place-items-center rounded-[6px] border border-[var(--line)] bg-white text-[var(--ink-soft)] transition hover:bg-[#faf6f2] hover:text-[var(--foreground)]",
+                      postPage >= postTotalPages && "pointer-events-none opacity-35",
+                    )}
+                  >
+                    <ChevronRight className="size-4" aria-hidden="true" />
+                  </Link>
+                </nav>
+              ) : null}
             </div>
 
             {selectedPost ? (
-              <article className="hidden rounded-[8px] border border-[#ddd2c9] bg-white p-6 shadow-[0_20px_56px_rgba(55,42,32,0.12)] xl:sticky xl:top-4 xl:block xl:self-start">
+              <article className="hidden rounded-[8px] border border-[#ddd2c9] bg-white p-6 shadow-[0_20px_56px_rgba(55,42,32,0.12)] xl:block xl:self-start">
                 <div className="flex flex-wrap items-center gap-3 opacity-60">
                   <span className="rounded-[6px] bg-[#f4ebe3] px-2 py-1 text-xs font-bold text-[var(--plum)]">
                     {categoryLabels[selectedPost.category]}
@@ -1241,6 +1316,7 @@ export function BoobooApp({
                           requests={personaRequestsForPost(selectedPost)}
                           signedIn={Boolean(session?.user)}
                           showPersonaPrompt={personaPromptIds.includes(comment.id)}
+                          onOpenPersonaPrompt={() => setPersonaPromptIds((current) => current.includes(comment.id) ? current : [...current, comment.id])}
                           onDismissPersonaPrompt={() => dismissPersonaPrompt(comment.id)}
                           onSavePersonas={(disclosures) => updateCommentPersonas(selectedPost.id, comment.id, disclosures)}
                           onUpdate={(body) =>
@@ -1540,6 +1616,7 @@ export function BoobooApp({
               commentCoolingDown={commentCoolingDown}
               commentPending={commentPending}
               personaPromptIds={personaPromptIds}
+              onOpenPersonaPrompt={(commentId) => setPersonaPromptIds((current) => current.includes(commentId) ? current : [...current, commentId])}
               onDismissPersonaPrompt={dismissPersonaPrompt}
               onSavePersonas={(commentId, disclosures) => updateCommentPersonas(selectedPost.id, commentId, disclosures)}
               onCommentDraftChange={(value) =>
@@ -1755,6 +1832,7 @@ function CommentCard({
   requests,
   signedIn,
   showPersonaPrompt,
+  onOpenPersonaPrompt,
   onDismissPersonaPrompt,
   onSavePersonas,
   onUpdate,
@@ -1765,6 +1843,7 @@ function CommentCard({
   requests: CommentPersonaRequest[];
   signedIn: boolean;
   showPersonaPrompt: boolean;
+  onOpenPersonaPrompt: () => void;
   onDismissPersonaPrompt: () => void;
   onSavePersonas: (disclosures: CommentPersonaDisclosure[]) => Promise<void>;
   onUpdate: (body: string) => Promise<boolean>;
@@ -1820,6 +1899,9 @@ function CommentCard({
     (request) => request.level === "REQUESTED" && !comment.personas?.some((persona) => persona.type === request.type),
   ) : [];
   const layerRequests = pendingRequests.length > 0 ? pendingRequests : optionalRequests;
+  const hasUndisclosedPersona = requests.some(
+    (request) => !comment.personas?.some((persona) => persona.type === request.type),
+  );
 
   return (
     <div className="relative">
@@ -1870,6 +1952,7 @@ function CommentCard({
                 aria-label="댓글 수정"
                 onClick={() => {
                   setEditing(true);
+                  if (hasUndisclosedPersona) onOpenPersonaPrompt();
                   setDeleteConfirmOpen(false);
                   setError("");
                 }}
@@ -1877,6 +1960,17 @@ function CommentCard({
               >
                 <Pencil className="size-3.5" aria-hidden="true" />
               </button>
+              {hasUndisclosedPersona ? (
+                <button
+                  type="button"
+                  title="내 정보 공개"
+                  aria-label="내 정보 공개"
+                  onClick={onOpenPersonaPrompt}
+                  className="grid size-7 place-items-center rounded-[6px] text-[var(--ink-soft)] hover:bg-white hover:text-[var(--plum)]"
+                >
+                  <Sparkles className="size-3.5" aria-hidden="true" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 title="댓글 삭제"
@@ -2024,6 +2118,7 @@ function MobilePostDetail({
   post,
   commentPending,
   personaPromptIds,
+  onOpenPersonaPrompt,
   onDismissPersonaPrompt,
   onSavePersonas,
   commentDraft,
@@ -2046,6 +2141,7 @@ function MobilePostDetail({
   onModerated: () => void;
   commentPending: boolean;
   personaPromptIds: string[];
+  onOpenPersonaPrompt: (commentId: string) => void;
   onDismissPersonaPrompt: (commentId: string) => void;
   onSavePersonas: (commentId: string, disclosures: CommentPersonaDisclosure[]) => Promise<void>;
   commentDraft: string;
@@ -2134,6 +2230,7 @@ function MobilePostDetail({
                 requests={personaRequestsForPost(post)}
                 signedIn={canUseName}
                 showPersonaPrompt={personaPromptIds.includes(comment.id)}
+                onOpenPersonaPrompt={() => onOpenPersonaPrompt(comment.id)}
                 onDismissPersonaPrompt={() => onDismissPersonaPrompt(comment.id)}
                 onSavePersonas={(disclosures) => onSavePersonas(comment.id, disclosures)}
                 onDelete={() => onDeleteComment(comment.id)}

@@ -10,6 +10,7 @@ import {
   seedPosts,
 } from "@/lib/community-data";
 import {
+  countCommunityPosts,
   getTodayCommunityMission,
   listAnonymousLetters,
   listCommunityPosts,
@@ -29,21 +30,29 @@ export const metadata: Metadata = {
 };
 
 type HomePageProps = {
-  searchParams: Promise<{ category?: string | string[] }>;
+  searchParams: Promise<{
+    category?: string | string[];
+    page?: string | string[];
+  }>;
 };
 
 export default async function Home({ searchParams }: HomePageProps) {
-  const [{ category }, session, cookieStore] = await Promise.all([
+  const [{ category, page: pageParam }, session, cookieStore] = await Promise.all([
     searchParams,
     auth(),
     cookies(),
   ]);
-  const [posts, letters, mission] = await Promise.all([
+  const activeCategory = normalizeCategory(category);
+  const page = normalizePage(pageParam);
+  const [posts, totalPosts, letters, mission] = await Promise.all([
     listCommunityPosts(
       session?.user?.id,
       cookieStore.get("booboo_anon_id")?.value,
       isAdminEmail(session?.user?.email),
+      page,
+      activeCategory,
     ).catch(() => seedPosts),
+    countCommunityPosts(activeCategory).catch(() => seedPosts.length),
     listAnonymousLetters(cookieStore.get("booboo_anon_id")?.value).catch(
       () => seedLetters,
     ),
@@ -55,9 +64,11 @@ export default async function Home({ searchParams }: HomePageProps) {
   return (
     <BoobooApp
       initialPosts={posts}
+      initialPostListPage={page}
+      initialPostListTotal={totalPosts}
       initialLetters={letters}
       initialMission={mission}
-      initialCategory={normalizeCategory(category)}
+      initialCategory={activeCategory}
     />
   );
 }
@@ -67,4 +78,10 @@ function normalizeCategory(value?: string | string[]): CategoryKey {
   return category === "talk" || category === "verdict" || category === "tips"
     ? category
     : "all";
+}
+
+function normalizePage(value?: string | string[]) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const page = Number.parseInt(raw ?? "1", 10);
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
 }

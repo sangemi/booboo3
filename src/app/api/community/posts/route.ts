@@ -1,28 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { seedPosts } from "@/lib/community-data";
+import {
+  categories,
+  COMMUNITY_POST_PAGE_SIZE,
+  seedPosts,
+  type CategoryKey,
+} from "@/lib/community-data";
 import { createPostSchema } from "@/lib/community-schema";
-import { createCommunityPost, listCommunityPosts } from "@/lib/community-service";
+import {
+  countCommunityPosts,
+  createCommunityPost,
+  listCommunityPosts,
+} from "@/lib/community-service";
 import { isAdminEmail } from "@/lib/admin-access";
 import { PostCooldownError, postIpHash } from "@/lib/post-rate-limit";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
-    const posts = await listCommunityPosts(
-      session?.user?.id,
-      request.cookies.get("booboo_anon_id")?.value,
-      isAdminEmail(session?.user?.email),
-    );
+    const page = normalizePage(request.nextUrl.searchParams.get("page"));
+    const category = normalizeCategory(request.nextUrl.searchParams.get("category"));
+    const [posts, total] = await Promise.all([
+      listCommunityPosts(
+        session?.user?.id,
+        request.cookies.get("booboo_anon_id")?.value,
+        isAdminEmail(session?.user?.email),
+        page,
+        category,
+      ),
+      countCommunityPosts(category),
+    ]);
     return NextResponse.json({
       posts,
+      page,
+      pageSize: COMMUNITY_POST_PAGE_SIZE,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / COMMUNITY_POST_PAGE_SIZE)),
       source: "database",
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Failed to list community posts", error);
-    return NextResponse.json({ posts: seedPosts, source: "seed" });
+    return NextResponse.json({
+      posts: seedPosts,
+      page: 1,
+      pageSize: COMMUNITY_POST_PAGE_SIZE,
+      total: seedPosts.length,
+      totalPages: 1,
+      source: "seed",
+    });
   }
+}
+
+function normalizePage(value: string | null) {
+  const page = Number.parseInt(value ?? "1", 10);
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
+}
+
+function normalizeCategory(value: string | null): Extract<CategoryKey, "all" | "talk" | "verdict" | "tips"> {
+  return categories.some((category) => category.key === value)
+    ? value === "talk" || value === "verdict" || value === "tips"
+      ? value
+      : "all"
+    : "all";
 }
 
 export async function POST(request: Request) {

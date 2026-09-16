@@ -19,6 +19,7 @@ import type {
   VerdictVoteModel,
 } from "@/generated/prisma/models";
 import type {
+  CategoryKey,
   CommunityPost,
   GenderLabel,
   Letter,
@@ -41,7 +42,11 @@ import {
   anonymousCommentAlias,
   anonymousCommentAliasCount,
 } from "@/lib/anonymous-comment-alias";
-import { dailyMissionSelection, missions } from "@/lib/community-data";
+import {
+  COMMUNITY_POST_PAGE_SIZE,
+  dailyMissionSelection,
+  missions,
+} from "@/lib/community-data";
 import { isAdminEmail } from "@/lib/admin-access";
 import { prisma } from "@/lib/db";
 import { formatMarriageYear, parseMarriageYear } from "@/lib/marriage-persona";
@@ -184,8 +189,12 @@ export async function listCommunityPosts(
   userId?: string,
   anonKey?: string,
   viewerIsAdmin = false,
+  page = 1,
+  category?: CategoryKey,
 ) {
+  const safePage = normalizePostPage(page);
   const posts = await prisma.post.findMany({
+    where: communityPostListWhere(category),
     orderBy: { createdAt: "desc" },
     include: {
       author: { select: authorSelect },
@@ -200,12 +209,39 @@ export async function listCommunityPosts(
       reactions: true,
       verdictVotes: true,
     },
-    take: 50,
+    skip: (safePage - 1) * COMMUNITY_POST_PAGE_SIZE,
+    take: COMMUNITY_POST_PAGE_SIZE,
   });
 
   return posts.map((post) =>
     toCommunityPost(post, userId, anonKey, viewerIsAdmin),
   );
+}
+
+export async function countCommunityPosts(category?: CategoryKey) {
+  return prisma.post.count({ where: communityPostListWhere(category) });
+}
+
+function normalizePostPage(page: number) {
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
+}
+
+function communityPostListWhere(category?: CategoryKey) {
+  if (!category || category === "all") return undefined;
+  if (category === "verdict") return { category: PostCategory.VERDICT };
+  if (category === "tips" || category === "together") {
+    return { category: { in: [PostCategory.TIPS, PostCategory.TOGETHER] } };
+  }
+  return {
+    category: {
+      in: [
+        PostCategory.TALK,
+        PostCategory.WORRY,
+        PostCategory.PARENTING,
+        PostCategory.LETTERS,
+      ],
+    },
+  };
 }
 
 export async function getCommunityPostByPublicId(

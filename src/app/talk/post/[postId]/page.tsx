@@ -14,6 +14,7 @@ import {
 } from "@/lib/community-data";
 import {
   categoryFromDb,
+  countCommunityPosts,
   getCommunityPostByPublicId,
   getCommunityPostSeoByPublicId,
   getTodayCommunityMission,
@@ -74,9 +75,11 @@ export async function generateMetadata({
 export default async function PostPage({ params, searchParams }: PostPageProps) {
   const { postId } = await params;
   const resolvedSearchParams = await searchParams;
-  const { category } = resolvedSearchParams;
+  const { category, page: pageParam } = resolvedSearchParams;
+  const activeCategory = normalizeCategory(category);
+  const page = normalizePage(pageParam);
   const [session, cookieStore] = await Promise.all([auth(), cookies()]);
-  const [post, posts, letters, mission] = await Promise.all([
+  const [post, posts, totalPosts, letters, mission] = await Promise.all([
     getCommunityPostByPublicId(
       Number(postId),
       session?.user?.id,
@@ -87,7 +90,10 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
       session?.user?.id,
       cookieStore.get("booboo_anon_id")?.value,
       isAdminEmail(session?.user?.email),
+      page,
+      activeCategory,
     ).catch(() => seedPosts),
+    countCommunityPosts(activeCategory).catch(() => seedPosts.length),
     listAnonymousLetters(cookieStore.get("booboo_anon_id")?.value).catch(
       () => seedLetters,
     ),
@@ -159,9 +165,11 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
       <BoobooApp
         initialPost={post}
         initialPosts={initialPosts}
+        initialPostListPage={page}
+        initialPostListTotal={totalPosts}
         initialLetters={letters}
         initialMission={mission}
-        initialCategory={normalizeCategory(category)}
+        initialCategory={activeCategory}
       />
     </>
   );
@@ -172,4 +180,10 @@ function normalizeCategory(value?: string | string[]): CategoryKey {
   return category === "talk" || category === "verdict" || category === "tips"
     ? category
     : "all";
+}
+
+function normalizePage(value?: string | string[]) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const page = Number.parseInt(raw ?? "1", 10);
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
 }

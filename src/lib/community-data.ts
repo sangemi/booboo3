@@ -47,6 +47,8 @@ export type CommunityPost = {
   adminHasMemberAuthor?: boolean;
 };
 
+export const COMMUNITY_POST_PAGE_SIZE = 20;
+
 export type CommentItem = {
   id: string;
   author: string;
