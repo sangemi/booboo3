@@ -1,6 +1,6 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import Kakao from "next-auth/providers/kakao";
@@ -8,6 +8,11 @@ import Kakao from "next-auth/providers/kakao";
 import { isAdminEmail } from "@/lib/admin-access";
 import { prisma } from "@/lib/db";
 import { syncSocialPersonas } from "@/lib/persona";
+import { postAccessError } from "@/lib/post-access";
+
+class EmailVerificationRequired extends CredentialsSignin {
+  code = "email_verification_required";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -29,10 +34,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!email || !password) return null;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({ where: { email }, include: { accounts: { select: { provider: true } } } });
 
         if (!user?.passwordHash || user.role === "SUSPENDED") return null;
         if (!(await bcrypt.compare(password, user.passwordHash))) return null;
+        if (postAccessError(user)) throw new EmailVerificationRequired();
 
         return {
           id: user.id,
@@ -85,6 +91,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           select: {
             name: true,
             email: true,
+            emailVerified: true,
+            accounts: { select: { provider: true } },
             nickname: true,
             role: true,
             image: true,
@@ -96,7 +104,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
         });
 
-        if (!profile || profile.role === "SUSPENDED") return null;
+        if (postAccessError(profile) || !profile) return null;
         token.name = profile.nickname ?? profile.name;
         token.email = profile.email;
         token.picture = profile.image;

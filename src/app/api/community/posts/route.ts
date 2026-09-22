@@ -15,6 +15,7 @@ import {
 } from "@/lib/community-service";
 import { isAdminEmail } from "@/lib/admin-access";
 import { PostCooldownError, postIpHash } from "@/lib/post-rate-limit";
+import { PostAccessError } from "@/lib/post-access";
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,13 +67,16 @@ function normalizeCategory(value: string | null): Extract<CategoryKey, "all" | "
 }
 
 export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "LOGIN_REQUIRED" }, { status: 401 });
+  }
   const clientIp = request.headers.get("x-real-ip") ??
     (process.env.NODE_ENV !== "production" ? "127.0.0.1" : "");
   const ipHash = postIpHash(clientIp, process.env.AUTH_SECRET ?? "");
   if (!ipHash) {
     return NextResponse.json({ error: "CLIENT_IP_UNAVAILABLE" }, { status: 503 });
   }
-  const session = await auth();
   const payload = await request.json();
   const parsed = createPostSchema.safeParse(payload);
 
@@ -91,6 +95,9 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ post, source: "database" }, { status: 201 });
   } catch (error) {
+    if (error instanceof PostAccessError) {
+      return NextResponse.json({ error: error.code }, { status: error.code === "LOGIN_REQUIRED" ? 401 : 403 });
+    }
     if (error instanceof PostCooldownError) {
       return NextResponse.json(
         { error: "POST_COOLDOWN", retryAfterSeconds: error.retryAfterSeconds },

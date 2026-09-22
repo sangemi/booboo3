@@ -511,6 +511,10 @@ export function BoobooApp({
 
   async function submitPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!session?.user?.id) {
+      setPostSubmitError("로그인 후 글을 올릴 수 있습니다.");
+      return;
+    }
     if (!newPost.title.trim() || !newPost.body.trim()) return;
     setPostSubmitError("");
 
@@ -538,6 +542,13 @@ export function BoobooApp({
       });
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          const result = await response.json();
+          setPostSubmitError(result.error === "EMAIL_VERIFICATION_REQUIRED"
+            ? "이메일 인증 후 글을 올릴 수 있습니다. 로그인 화면에서 인증해 주세요."
+            : "로그인 상태와 계정 이용 권한을 확인해 주세요.");
+          return;
+        }
         if (response.status === 429) {
           const result = (await response.json()) as { retryAfterSeconds?: number };
           const minutes = Math.ceil((result.retryAfterSeconds ?? 180) / 60);
@@ -973,7 +984,13 @@ export function BoobooApp({
                 type="button"
                 aria-expanded={composerOpen}
                 aria-controls="community-composer"
-                onClick={() => setComposerOpen((value) => !value)}
+                onClick={() => {
+                  if (!session?.user?.id) {
+                    router.push(`/login?callbackUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`);
+                    return;
+                  }
+                  setComposerOpen((value) => !value);
+                }}
                 className={cn(
                   "inline-flex h-10 items-center justify-center gap-1.5 rounded-[6px] px-3 text-xs font-bold transition sm:px-4 sm:text-sm",
                   composerOpen
@@ -1129,6 +1146,44 @@ export function BoobooApp({
 
           <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
             <div className="overflow-hidden rounded-[8px] border border-[#ebe3dc] bg-[#fffdfa]">
+              {postTotalPages > 1 ? (
+                <nav
+                  className="flex items-center justify-center gap-3 border-b border-[#eee7e1] px-3 py-3"
+                  aria-label="게시글 목록 페이지"
+                >
+                  <Link
+                    href={postPage > 1 ? listPageHref(postPage - 1) : "#"}
+                    aria-label="이전 글 목록"
+                    aria-disabled={postPage <= 1}
+                    title="이전 글 목록"
+                    className={cn(
+                      "grid size-8 place-items-center rounded-[6px] border border-[var(--line)] bg-white text-[var(--ink-soft)] transition hover:bg-[#faf6f2] hover:text-[var(--foreground)]",
+                      postPage <= 1 && "pointer-events-none opacity-35",
+                    )}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden="true" />
+                  </Link>
+                  <span className="min-w-14 text-center text-xs font-bold text-[var(--ink-soft)]">
+                    {postPage} / {postTotalPages}
+                  </span>
+                  <Link
+                    href={
+                      postPage < postTotalPages
+                        ? listPageHref(postPage + 1)
+                        : "#"
+                    }
+                    aria-label="다음 글 목록"
+                    aria-disabled={postPage >= postTotalPages}
+                    title="다음 글 목록"
+                    className={cn(
+                      "grid size-8 place-items-center rounded-[6px] border border-[var(--line)] bg-white text-[var(--ink-soft)] transition hover:bg-[#faf6f2] hover:text-[var(--foreground)]",
+                      postPage >= postTotalPages && "pointer-events-none opacity-35",
+                    )}
+                  >
+                    <ChevronRight className="size-4" aria-hidden="true" />
+                  </Link>
+                </nav>
+              ) : null}
               {filteredPosts.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-sm text-[var(--ink-soft)]">
@@ -1139,7 +1194,9 @@ export function BoobooApp({
                   <button
                     type="button"
                     onClick={() =>
-                      query.trim() ? setQuery("") : setComposerOpen(true)
+                      query.trim() ? setQuery("") : session?.user?.id
+                        ? setComposerOpen(true)
+                        : router.push(`/login?callbackUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`)
                     }
                     className="mt-3 text-sm font-bold text-[var(--plum)] hover:underline"
                   >
@@ -1201,44 +1258,6 @@ export function BoobooApp({
                   </Link>
                 );
               })}
-              {postTotalPages > 1 ? (
-                <nav
-                  className="flex items-center justify-center gap-3 border-t border-[#eee7e1] px-3 py-3"
-                  aria-label="게시글 목록 페이지"
-                >
-                  <Link
-                    href={postPage > 1 ? listPageHref(postPage - 1) : "#"}
-                    aria-label="이전 글 목록"
-                    aria-disabled={postPage <= 1}
-                    title="이전 글 목록"
-                    className={cn(
-                      "grid size-8 place-items-center rounded-[6px] border border-[var(--line)] bg-white text-[var(--ink-soft)] transition hover:bg-[#faf6f2] hover:text-[var(--foreground)]",
-                      postPage <= 1 && "pointer-events-none opacity-35",
-                    )}
-                  >
-                    <ChevronLeft className="size-4" aria-hidden="true" />
-                  </Link>
-                  <span className="min-w-14 text-center text-xs font-bold text-[var(--ink-soft)]">
-                    {postPage} / {postTotalPages}
-                  </span>
-                  <Link
-                    href={
-                      postPage < postTotalPages
-                        ? listPageHref(postPage + 1)
-                        : "#"
-                    }
-                    aria-label="다음 글 목록"
-                    aria-disabled={postPage >= postTotalPages}
-                    title="다음 글 목록"
-                    className={cn(
-                      "grid size-8 place-items-center rounded-[6px] border border-[var(--line)] bg-white text-[var(--ink-soft)] transition hover:bg-[#faf6f2] hover:text-[var(--foreground)]",
-                      postPage >= postTotalPages && "pointer-events-none opacity-35",
-                    )}
-                  >
-                    <ChevronRight className="size-4" aria-hidden="true" />
-                  </Link>
-                </nav>
-              ) : null}
             </div>
 
             {selectedPost ? (

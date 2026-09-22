@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/booboo/site-header";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "로그인",
+  referrer: "no-referrer",
   robots: { index: false, follow: false },
 };
 

@@ -52,6 +52,7 @@ import { prisma } from "@/lib/db";
 import { formatMarriageYear, parseMarriageYear } from "@/lib/marriage-persona";
 import { normalizePersonaValue } from "@/lib/persona";
 import { PostCooldownError, postRetryAfterSeconds } from "@/lib/post-rate-limit";
+import { PostAccessError, postAccessError } from "@/lib/post-access";
 
 type AuthorSummary = {
   name: string | null;
@@ -387,6 +388,12 @@ export async function createCommunityPost(input: {
   );
 
   const post = await prisma.$transaction(async (tx) => {
+    const member = input.userId ? await tx.user.findUnique({
+      where: { id: input.userId },
+      select: { role: true, emailVerified: true, accounts: { select: { provider: true } } },
+    }) : null;
+    const accessError = postAccessError(member);
+    if (accessError) throw new PostAccessError(accessError);
     await tx.$executeRaw`
       DELETE FROM "PostRateLimit" WHERE "lastPostedAt" < CURRENT_TIMESTAMP - INTERVAL '1 day'
     `;

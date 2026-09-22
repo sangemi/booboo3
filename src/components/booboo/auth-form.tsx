@@ -50,10 +50,15 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
     searchParams.get("callbackUrl") ?? searchParams.get("redirect"),
   );
   const [error, setError] = useState("");
+  const [registered, setRegistered] = useState(false);
+  const [verificationNeeded, setVerificationNeeded] = useState(searchParams.get("verify") === "1");
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const verificationToken = searchParams.get("verification");
   const [socialLoading, setSocialLoading] = useState<"google" | "kakao" | null>(
     null,
   );
-  const isRegister = mode === "register";
+  const isRegister = mode === "register" && !registered;
   const schema = isRegister ? registerSchema : loginSchema;
   const form = useForm<AuthValues>({
     resolver: zodResolver(schema) as unknown as Resolver<AuthValues>,
@@ -88,6 +93,11 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
         setError(data.error || "가입을 마치지 못했습니다.");
         return;
       }
+      setRegistered(true);
+      setVerificationNeeded(true);
+      setNotice("가입되었습니다. 이메일 인증을 완료해 주세요.");
+      await verifyEmail("send");
+      return;
     }
 
     const result = await signIn("credentials", {
@@ -98,6 +108,11 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
     });
 
     if (result?.error) {
+      if (result.code === "email_verification_required") {
+        setVerificationNeeded(true);
+        setError("이메일 인증 후 로그인할 수 있습니다.");
+        return;
+      }
       setError(
         isRegister
           ? "가입은 완료됐지만 자동 로그인에 실패했습니다. 다시 로그인해 주세요."
@@ -108,6 +123,32 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
 
     router.push(redirectTo);
     router.refresh();
+  }
+
+  async function verifyEmail(action: "send" | "verify") {
+    setVerificationBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const values = form.getValues();
+      const response = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "send"
+          ? { action, email: values.email, password: values.password }
+          : { action, email: searchParams.get("email"), token: verificationToken }),
+      });
+      const data = await response.json();
+      if (!response.ok) { setError(data.error || "인증을 처리하지 못했습니다."); return; }
+      setNotice(action === "send" ? "인증 메일을 보냈습니다. 메일함을 확인해 주세요." : "이메일 인증이 완료되었습니다. 로그인해 주세요.");
+      if (action === "verify") {
+        setVerificationNeeded(false);
+        form.setValue("email", searchParams.get("email") ?? "");
+        router.replace(`/login?callbackUrl=${encodeURIComponent(redirectTo)}`);
+      }
+    } catch {
+      setError("연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally { setVerificationBusy(false); }
   }
 
   async function socialLogin(provider: "google" | "kakao") {
@@ -178,6 +219,19 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
         <span className="h-px flex-1 bg-[var(--line)]" />
       </div>
 
+      {verificationToken ? (
+        <button type="button" disabled={verificationBusy} onClick={() => verifyEmail("verify")}
+          className="mb-4 h-11 w-full rounded-[8px] bg-[var(--plum)] text-sm font-bold text-white disabled:opacity-55">
+          이메일 인증 완료하기
+        </button>
+      ) : null}
+      {notice ? <p role="status" className="mb-4 text-sm text-[var(--leaf)]">{notice}</p> : null}
+      {verificationNeeded ? (
+        <button type="button" disabled={verificationBusy} onClick={() => verifyEmail("send")}
+          className="mb-4 h-11 w-full rounded-[8px] border border-[var(--line)] text-sm font-bold disabled:opacity-55">
+          인증 메일 보내기
+        </button>
+      ) : null}
       <form onSubmit={form.handleSubmit(submit)} className="space-y-4" noValidate>
         {isRegister ? (
           <Field label="닉네임" error={nicknameError}>
