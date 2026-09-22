@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { CommentPersonaLayer } from "@/components/booboo/comment-persona-layer";
+import { useCommentDrafts } from "@/components/booboo/use-comment-drafts";
 import { PostModerationControls } from "@/components/booboo/post-moderation-controls";
 import { VerifiedName } from "@/components/booboo/verified-name";
 import {
@@ -153,7 +154,11 @@ export function BoobooApp({
     authorPersonaIds: [] as string[],
     commentPersonaRequests: [...defaultCommentPersonaRequests],
   });
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentDrafts, setCommentDrafts] = useCommentDrafts(
+    sessionStatus === "loading"
+      ? "loading"
+      : session?.user?.id ? `member:${session.user.id}` : "visitor",
+  );
   const [commentSubmitErrors, setCommentSubmitErrors] = useState<
     Record<string, string>
   >({});
