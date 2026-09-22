@@ -1,4 +1,19 @@
 import { prisma } from "@/lib/db";
+import { summarizeParticipation } from "@/lib/community-participation";
+
+export async function getMemberParticipation(now = new Date()) {
+  const rangeStart = new Date(`${koreanDateKey(now)}T00:00:00+09:00`);
+  rangeStart.setUTCDate(rangeStart.getUTCDate() - 13);
+  const select = {
+    id: true, authorName: true,
+    author: { select: { id: true, email: true, role: true } },
+  } as const;
+  const [posts, comments] = await Promise.all([
+    prisma.post.findMany({ where: { createdAt: { gte: rangeStart, lte: now } }, select }),
+    prisma.comment.findMany({ where: { createdAt: { gte: rangeStart, lte: now }, pendingPersonaTypes: { isEmpty: true } }, select }),
+  ]);
+  return summarizeParticipation(posts, comments);
+}
 
 export type ActivityDay = { label: string; signups: number; visitors: number };
 

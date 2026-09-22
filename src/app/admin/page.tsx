@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { getAdminActivityDays } from "@/lib/admin-analytics";
+import { getAdminActivityDays, getMemberParticipation } from "@/lib/admin-analytics";
 import { categoryLabels } from "@/lib/community-data";
 import { categoryFromDb } from "@/lib/community-service";
 import { prisma } from "@/lib/db";
@@ -29,6 +29,7 @@ export default async function AdminOverviewPage() {
     categoryCounts,
     activityDays,
     latestUsers,
+    participation,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: today } } }),
@@ -54,6 +55,7 @@ export default async function AdminOverviewPage() {
         _count: { select: { posts: true, comments: true } },
       },
     }),
+    getMemberParticipation(),
   ]);
 
   const maxActivity = Math.max(
@@ -69,6 +71,17 @@ export default async function AdminOverviewPage() {
           가입과 커뮤니티 활동을 실제 데이터로 확인합니다.
         </p>
       </div>
+
+      <section className="mt-6 border-t border-[#d8d2cc] pt-5" aria-label="일반 회원 참여">
+        <h2 className="text-base font-bold">최근 14일 일반 회원 참여</h2>
+        <p className="mt-1 text-xs text-[#746e6a]">AI·관리자·알려진 테스트 계정 제외 · 공개된 글과 댓글 기준</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric icon={Users} label="참여 회원" value={`${participation.members}명`} note="글·댓글 작성 계정 중복 제외" />
+          <Metric icon={FileText} label="회원 글" value={`${participation.posts}개`} note="익명으로 표시한 회원 글 포함" />
+          <Metric icon={MessageCircle} label="회원 댓글" value={`${participation.comments}개`} note="미공개 댓글 제외" />
+          <Metric icon={MessageCircle} label="작성자 미확인 활동" value={`${participation.unidentified}개`} note="계정 미연결 · 회원 참여와 별도 집계" />
+        </div>
+      </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="핵심 통계">
         <Metric icon={Users} label="전체 회원" value={`${totalUsers.toLocaleString()}명`} note={`오늘 +${todayUsers.toLocaleString()}`} />

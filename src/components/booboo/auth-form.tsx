@@ -140,7 +140,7 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
       });
       const data = await response.json();
       if (!response.ok) { setError(data.error || "인증을 처리하지 못했습니다."); return; }
-      setNotice(action === "send" ? "인증 메일을 보냈습니다. 메일함을 확인해 주세요." : "이메일 인증이 완료되었습니다. 로그인해 주세요.");
+      setNotice(action === "send" ? "메일 확인 후 로그인해 주세요." : "이메일 인증이 완료되었습니다. 로그인해 주세요.");
       if (action === "verify") {
         setVerificationNeeded(false);
         form.setValue("email", searchParams.get("email") ?? "");
@@ -229,7 +229,7 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
       {verificationNeeded ? (
         <button type="button" disabled={verificationBusy} onClick={() => verifyEmail("send")}
           className="mb-4 h-11 w-full rounded-[8px] border border-[var(--line)] text-sm font-bold disabled:opacity-55">
-          인증 메일 보내기
+          인증 메일 다시 보내기
         </button>
       ) : null}
       <form onSubmit={form.handleSubmit(submit)} className="space-y-4" noValidate>
@@ -269,24 +269,23 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
         {isRegister ? (
           <fieldset>
             <legend className="mb-2 text-sm font-bold">성별 (선택)</legend>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { label: "남성", value: "남성" },
                 { label: "여성", value: "여성" },
-                { label: "건너뛰기", value: "" },
               ].map((option) => (
                 <button
                   key={option.label}
                   type="button"
+                  aria-pressed={selectedGender === option.value}
                   onClick={() =>
                     form.setValue(
                       "gender",
-                      option.value ? (option.value as "남성" | "여성") : undefined,
+                      selectedGender === option.value ? undefined : (option.value as "남성" | "여성"),
                     )
                   }
                   className={`h-10 rounded-[8px] border text-sm transition ${
-                    selectedGender === option.value ||
-                    (!selectedGender && !option.value)
+                    selectedGender === option.value
                       ? "border-[var(--plum)] bg-[#f4ebe3] font-bold text-[var(--plum)]"
                       : "border-[var(--line)] text-[var(--ink-soft)] hover:bg-[#faf7f4]"
                   }`}
@@ -317,7 +316,7 @@ export function AuthForm({ mode, googleEnabled, kakaoEnabled }: AuthFormProps) {
           ) : (
             <ArrowRight className="size-4" />
           )}
-          {isRegister ? "가입하고 시작하기" : "로그인"}
+          {isRegister ? "가입하기" : "로그인"}
         </button>
       </form>
 

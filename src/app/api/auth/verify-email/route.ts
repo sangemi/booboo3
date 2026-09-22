@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [email], subject: "[부부라이프] 이메일을 인증해 주세요", text: `아래 링크에서 이메일 인증을 완료해 주세요. 링크는 30분 동안 유효합니다.\n\n${url.toString()}\n\n요청하지 않았다면 이 메일을 무시해 주세요.` }),
+      body: JSON.stringify({ from, to: [email], subject: "[부부라이프] 이메일을 인증해 주세요", text: `아래 링크를 열고 '이메일 인증 완료하기' 버튼을 눌러 주세요. 인증 후 로그인할 수 있습니다. 링크는 30분 동안 유효합니다.\n\n${url.toString()}\n\n요청하지 않았다면 이 메일을 무시해 주세요.` }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) return NextResponse.json({ error: "메일 발송에 실패했습니다. 1분 뒤 다시 시도해 주세요." }, { status: 503 });
