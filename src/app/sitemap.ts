@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const staticPages = [
   "/about",
+  "/havruta",
   "/ai-operations",
   "/company/terms",
   "/company/privacy",

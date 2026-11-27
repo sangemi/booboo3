@@ -20,7 +20,7 @@ import { VerifiedName } from "@/components/booboo/verified-name";
 import { cn } from "@/lib/utils";
 
 type SiteHeaderProps = {
-  active: "about" | "community" | "company";
+  active: "about" | "havruta" | "community" | "company";
   query?: string;
   onQueryChange?: (value: string) => void;
   muted?: boolean;
@@ -29,6 +29,7 @@ type SiteHeaderProps = {
 
 const navItems = [
   { href: "/about", label: "소개", key: "about" },
+  { href: "/havruta", label: "부부하브루타", key: "havruta" },
   { href: "/", label: "커뮤니티", key: "community" },
 ] as const;
 
@@ -102,6 +103,7 @@ export function SiteHeader({
             <Link
               key={item.key}
               href={item.href}
+              aria-current={active === item.key ? "page" : undefined}
               className={cn(
                 "rounded-[8px] px-3 py-2 text-sm font-bold transition",
                 active === item.key
@@ -196,6 +198,7 @@ export function SiteHeader({
               <Link
                 key={item.key}
                 href={item.href}
+                aria-current={active === item.key ? "page" : undefined}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
                   "rounded-[8px] px-3 py-3 text-sm font-bold",
