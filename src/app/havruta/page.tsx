@@ -24,11 +24,24 @@ export const metadata: Metadata = {
 
 const tabs = [
   { key: "all", label: "전체" },
-  { key: "intro", label: "과정 소개" },
-  { key: "curriculum", label: "12회 커리큘럼" },
-  { key: "practice", label: "10분 실습" },
+  { key: "intro", label: "부부하브루타란?" },
+  { key: "effects", label: "효과" },
+  { key: "curriculum", label: "커리큘럼" },
   { key: "instructor", label: "강사 소개" },
 ] as const;
+
+const conversationPrinciples = [
+  ["질문", "짐작으로 빈칸을 채우기 전에 상대가 겪은 일을 물어봅니다."],
+  ["경청", "끼어들거나 조언하기 전에 끝까지 듣고, 이해한 뜻을 짧게 확인합니다."],
+  ["의견 나누기", "생각이 다른 지점을 말하고, 각자 어떤 이유로 그렇게 보는지 들어봅니다."],
+  ["새롭게 이해하기", "둘이 이야기하고 나서야 보인 점을 하나씩 짚어봅니다."],
+];
+
+const conversationExamples = [
+  { situation: "연락 없이 늦은 날", before: "한 통 보내는 게 그렇게 어려워?", after: "기다리면서 걱정됐어. 오늘 어떤 일이 있었어?" },
+  { situation: "주말 계획이 엇갈릴 때", before: "또 네 마음대로 정했네.", after: "이번 주말에 꼭 하고 싶었던 게 뭐였어?" },
+  { situation: "저녁 식탁에서", before: "오늘도 똑같았지?", after: "오늘 있었던 일 중에 나한테도 들려주고 싶은 장면이 있어?" },
+];
 
 const curriculum = [
   {
@@ -70,7 +83,8 @@ export default async function HavrutaPage({
   searchParams: Promise<{ view?: string | string[] }>;
 }) {
   const { view } = await searchParams;
-  const active = tabs.find(({ key }) => key === view)?.key ?? "all";
+  const selectedView = view === "practice" ? "intro" : view;
+  const active = tabs.find(({ key }) => key === selectedView)?.key ?? "all";
   const show = (key: typeof active) => active === "all" || active === key;
 
   return (
@@ -111,9 +125,64 @@ export default async function HavrutaPage({
           {show("intro") && (
             <section id="intro" className={sectionClass}>
               <h2 className={headingClass}>부부하브루타란?</h2>
-              <p className={bodyClass}>하브루타는 두 사람이 짝을 이루어 함께 읽고 묻고 생각하는 유대 전통의 학습 방식입니다. 부부하브루타는 그 방식을 집으로 가져옵니다. 서로 한 번씩 말하고, 들은 뜻이 맞는지 확인하고, 의견이 달라도 함께 해볼 작은 약속을 정합니다.</p>
-              <p className={bodyClass}>대화가 일정과 할 일로 끝나는 부부, 같은 문제로 자주 부딪히는 부부, 자녀와도 질문을 나누는 집을 만들고 싶은 부부를 위한 과정입니다.</p>
+              <p className={bodyClass}>저녁 메뉴와 내일 일정을 이야기했는데, 정작 서로 어떤 하루를 보냈는지는 모를 때가 있습니다. 오래 함께한 부부도 마찬가지입니다. 부부하브루타는 매일 마주치는 사람에게 아직 모르는 것이 있다는 데서 시작합니다.</p>
+
+              <h3 className="mt-8 text-xl font-bold">짝과 함께 묻고 생각하는 전통</h3>
+              <p className={bodyClass}>하브루타는 학습 짝을 뜻하는 말로, 유대 전통에서 두 사람이 글을 함께 읽고 서로의 해석을 묻는 방식입니다. 같은 문장을 읽어도 각자 주목하는 부분이 다릅니다. 상대의 질문에 답하며 자기 생각을 더 분명히 살펴볼 수 있습니다. 부부는 한 문장 대신 오늘 겪은 일 하나로 시작해도 좋습니다.</p>
+              <dl className="mt-5 max-w-3xl divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                {conversationPrinciples.map(([title, detail]) => (
+                  <div key={title} className="grid gap-1 py-3 sm:grid-cols-[8rem_1fr] sm:gap-4">
+                    <dt className="font-bold text-[#345b48]">{title}</dt>
+                    <dd className="text-sm leading-6 text-[var(--ink-soft)]">{detail}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              <h3 className="mt-8 text-xl font-bold">같은 상황에서 어떤 말을 건넬까요?</h3>
+              <div className="mt-4 max-w-3xl divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                {conversationExamples.map(({ situation, before, after }) => (
+                  <div key={situation} className="py-4">
+                    <h4 className="font-bold">{situation}</h4>
+                    <dl className="mt-2 grid gap-x-4 gap-y-1 text-sm leading-6 sm:grid-cols-[5rem_1fr]">
+                      <dt className="text-[var(--ink-soft)]">익숙한 말</dt>
+                      <dd className="text-[var(--ink-soft)]">“{before}”</dd>
+                      <dt className="font-bold text-[#345b48]">바꿔 묻기</dt>
+                      <dd>“{after}”</dd>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+
+              <h3 id="practice" className="mt-8 scroll-mt-6 text-xl font-bold">오늘 저녁, 10분 실습</h3>
+              <p className={bodyClass}>둘 다 여유가 있는 시간에 휴대폰을 내려놓고, 지금 편하게 답할 수 있는 질문을 하나 고릅니다.</p>
+              <ul className="mt-4 ml-5 max-w-3xl list-disc space-y-2 leading-7">
+                <li>오늘 마음이 한결 가벼워진 순간이 있었어?</li>
+                <li>요즘 집에서 혼자 챙기느라 버겁게 느끼는 일이 있어?</li>
+                <li>최근에 내가 한 말 중에 오래 기억에 남은 말이 있어?</li>
+              </ul>
+              <p className={bodyClass}>먼저 한 사람이 묻고 5분 동안 듣습니다. 다 들으면 “내가 이렇게 이해했는데 맞아?”라고 확인한 뒤 역할을 바꿉니다. 답하기 어려운 질문은 건너뛰어도 됩니다. 마지막에 오늘 새로 알게 된 점을 한 가지씩 나눠보세요.</p>
               <a href="https://havruta-seung-a.tistory.com/1" className="mt-4 inline-block text-sm text-[#345b48] underline underline-offset-4">참고 글 · 부부하브루타란 무엇인가</a>
+            </section>
+          )}
+
+          {show("effects") && (
+            <section id="effects" className={sectionClass}>
+              <h2 className={headingClass}>효과</h2>
+              <p className={bodyClass}>부부하브루타는 상대의 생각을 더 구체적으로 듣고, 의견이 갈릴 때 다시 이야기할 방법을 연습하는 데 도움이 될 수 있습니다.</p>
+              <dl className="mt-5 max-w-3xl divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                <div className="py-4">
+                  <dt className="font-bold">일정 밖의 이야기도 나눕니다</dt>
+                  <dd className="mt-1 text-sm leading-7 text-[var(--ink-soft)]">집안일과 내일 일정을 함께 챙기는 사이이기에, 짧게라도 서로에게 물어볼 기회를 만들 수 있습니다. 요즘 무엇이 힘든지, 어떤 말에 힘을 얻었는지 구체적으로 알아갑니다.</dd>
+                </div>
+                <div className="py-4">
+                  <dt className="font-bold">서로 다르게 생각하는 이유를 알아봅니다</dt>
+                  <dd className="mt-1 text-sm leading-7 text-[var(--ink-soft)]">생활비나 주말 계획을 놓고 의견이 다를 때, 각자 무엇이 중요했는지 물어봅니다. 그 이유를 알고 나면 두 사람이 받아들일 수 있는 작은 약속을 찾기가 수월해질 수 있습니다.</dd>
+                </div>
+                <div className="py-4">
+                  <dt className="font-bold">아이의 질문을 받는 습관으로 이어갑니다</dt>
+                  <dd className="mt-1 text-sm leading-7 text-[var(--ink-soft)]">질문을 주고받는 식탁 대화는 자녀와도 해볼 수 있습니다. 함께 읽은 기사나 책에서 각자 궁금했던 대목을 고르면, 아이가 자기 생각을 말하고 어른도 그 이유를 듣는 시간이 됩니다.</dd>
+                </div>
+              </dl>
             </section>
           )}
 
@@ -134,18 +203,6 @@ export default async function HavrutaPage({
                   </ol>
                 </div>
               ))}
-            </section>
-          )}
-
-          {show("practice") && (
-            <section id="practice" className={sectionClass}>
-              <h2 className={headingClass}>오늘 저녁, 10분 실습</h2>
-              <blockquote className="mt-5 border-l-2 border-[#57806a] pl-4 font-serif text-2xl font-bold">오늘 내가 몰랐던 당신의 하루는 어땠어?</blockquote>
-              <ol className="mt-5 ml-5 max-w-3xl list-decimal space-y-2 text-base leading-7 text-[var(--ink-soft)]">
-                <li>둘 다 이야기할 마음이 있는 시간에, 한 사람이 먼저 묻습니다.</li>
-                <li>5분 동안 말을 끊지 않고 듣습니다. 다 들으면 “내가 이렇게 이해했는데 맞아?”라고 확인합니다.</li>
-                <li>역할을 바꿔 5분을 씁니다. 답하기 어려운 질문은 서로 건너뛸 수 있습니다.</li>
-              </ol>
             </section>
           )}
 
