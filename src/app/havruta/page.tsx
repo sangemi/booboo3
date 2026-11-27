@@ -8,7 +8,7 @@ import { SiteHeader } from "@/components/booboo/site-header";
 import { operator } from "@/lib/legal";
 
 const path = "/havruta";
-const description = "하브루타 전문 강사 자격을 보유한 15년 차 이혼 전문 변호사 김상겸과 함께하는 부부 대화 실습 12회 과정.";
+const description = "하브루타 전문 강사 자격을 보유한 15년 차 이혼 전문 변호사, SK 변호사와 함께하는 부부 대화 실습 12회 과정.";
 
 export const metadata: Metadata = {
   title: "부부하브루타 | 부부 대화 실습 12회 과정",
@@ -81,7 +81,7 @@ export default async function HavrutaPage({
           <Image src="/brand/havruta-conversation.jpg" alt="" fill priority sizes="100vw" className="object-cover object-center" />
           <div className="absolute inset-0 bg-[#162822]/75" />
           <div className="relative mx-auto max-w-[1080px] px-4 py-10 md:px-8 md:py-16">
-            <p className="text-sm font-semibold text-[#d7ecdf]">김상겸 변호사와 함께하는 12회 부부 대화 수업</p>
+            <p className="text-sm font-semibold text-[#d7ecdf]">SK 변호사와 함께하는 부부 대화 수업</p>
             <h1 className="mt-3 font-serif text-4xl font-bold leading-tight md:text-6xl">부부하브루타</h1>
             <p className="mt-4 max-w-lg text-base leading-7 md:text-lg">또 같은 말로 다투기 전에, 질문 하나를 바꿔보세요. 집안일, 생활비, 양가 가족처럼 피하기 쉬운 이야기부터 함께 연습합니다.</p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -152,9 +152,16 @@ export default async function HavrutaPage({
           {show("instructor") && (
             <section id="instructor" className={sectionClass}>
               <h2 className={headingClass}>강사 소개</h2>
-              <p className="mt-5 text-xl font-bold">김상겸 변호사</p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#345b48]">15년 차 이혼 전문 변호사 · 하브루타 전문 강사 자격 보유</p>
-              <p className={bodyClass}>이혼 사건을 다루며 마주한 부부 갈등에서 출발해, 평소 꺼내기 어려웠던 말을 식탁에서 연습할 수 있도록 구성했습니다. 한 가지 상황을 두 사람의 눈으로 보고, 다음에 그 일이 생겼을 때 쓸 질문을 함께 만듭니다.</p>
+              <h3 className="mt-5 text-xl font-bold">SK 변호사</h3>
+              <dl className="mt-4 grid gap-x-4 gap-y-2 text-sm leading-6 sm:grid-cols-[auto_1fr]">
+                <dt className="font-bold text-[#345b48]">경력</dt>
+                <dd>15년 차 이혼 전문 변호사</dd>
+                <dt className="font-bold text-[#345b48]">자격</dt>
+                <dd>하브루타 전문 강사 자격 보유</dd>
+              </dl>
+              <p className={bodyClass}>이혼 사건을 다루며 마주한 부부 갈등을 바탕으로 수업을 구성했습니다. 집안일이나 생활비처럼 같은 문제로 자주 부딪힐 때, 두 사람이 그 일을 각각 어떻게 받아들였는지부터 살핍니다.</p>
+              <p className={bodyClass}>수업에서는 추궁처럼 들리는 말을 열린 질문으로 바꾸고, 상대의 답을 내 말로 되짚어봅니다. 연습을 마치면 비슷한 상황에서 꺼내볼 질문 한 문장과 함께 시도할 작은 약속을 정합니다.</p>
+              <p className="mt-6 text-xs text-[var(--ink-soft)]">강사 실명: 김상겸</p>
             </section>
           )}
         </div>
