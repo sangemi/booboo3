@@ -43,6 +43,19 @@ const conversationExamples = [
   { situation: "저녁 식탁에서", before: "오늘도 똑같았지?", after: "오늘 있었던 일 중에 나한테도 들려주고 싶은 장면이 있어?" },
 ];
 
+const practiceDialogue = [
+  ["묻는 사람", "오늘 퇴근길에도 자꾸 떠오른 일이 있었어?"],
+  ["답하는 사람", "회의에서 내가 준비한 안이 바로 넘어갔어. 그때는 그냥 괜찮다고 했는데 계속 생각나."],
+  ["묻는 사람", "그 장면에서 어떤 게 제일 마음에 남았어?"],
+  ["답하는 사람", "안이 안 된 것보다, 왜 그렇게 준비했는지 아무도 안 물어본 게 서운했어."],
+];
+
+const practiceQuestions = [
+  ["평소 대화가 거의 없어도 할 수 있나요?", "무거운 주제를 꺼내기 전에 오늘 있었던 작은 일 하나를 물어보세요. 한두 문장만 나누고 마쳐도 됩니다."],
+  ["배우자가 말이 적으면 어떻게 하나요?", "둘 다 편한 때를 고르고, 넓게 묻기보다 한 장면을 짚어보세요. 바로 답하기 어렵다면 생각할 시간을 줍니다."],
+  ["수업을 들어야 시작할 수 있나요?", "오늘 저녁에도 해볼 수 있습니다. 서로 편할 때 질문 하나를 고르고, 5분씩 묻는 사람과 듣는 사람을 바꿔보세요."],
+];
+
 const curriculum = [
   {
     phase: "기초 · 서로의 말을 듣는 연습",
@@ -127,6 +140,15 @@ export default async function HavrutaPage({
               <h2 className={headingClass}>부부하브루타란?</h2>
               <p className={bodyClass}>저녁 메뉴와 내일 일정을 이야기했는데, 정작 서로 어떤 하루를 보냈는지는 모를 때가 있습니다. 오래 함께한 부부도 마찬가지입니다. 부부하브루타는 매일 마주치는 사람에게 아직 모르는 것이 있다는 데서 시작합니다.</p>
 
+              <h3 className="mt-8 text-xl font-bold">우리 대화에도 이런 순간이 있나요?</h3>
+              <ul className="mt-4 ml-5 max-w-3xl list-disc space-y-2 leading-7">
+                <li>식사와 일정 얘기가 끝나면 무슨 말을 꺼낼지 막막해집니다.</li>
+                <li>한 공간에 있으면서 각자 휴대폰만 보다가 하루가 끝납니다.</li>
+                <li>같은 얘기를 되풀이할 것 같아서, 하려던 말을 중간에 접습니다.</li>
+                <li>말은 오래 했는데 내 마음은 전하지 못한 것 같고, 배우자가 요즘 무엇을 좋아하는지도 잘 모르겠습니다.</li>
+              </ul>
+              <p className={bodyClass}>마음을 꺼내는 게 어색하다면, 상대가 고치길 바라는 일보다 그 사람이 오늘 어떻게 지냈는지부터 물어보세요.</p>
+
               <h3 className="mt-8 text-xl font-bold">짝과 함께 묻고 생각하는 전통</h3>
               <p className={bodyClass}>하브루타는 학습 짝을 뜻하는 말로, 유대 전통에서 두 사람이 글을 함께 읽고 서로의 해석을 묻는 방식입니다. 같은 문장을 읽어도 각자 주목하는 부분이 다릅니다. 상대의 질문에 답하며 자기 생각을 더 분명히 살펴볼 수 있습니다. 부부는 한 문장 대신 오늘 겪은 일 하나로 시작해도 좋습니다.</p>
               <dl className="mt-5 max-w-3xl divide-y divide-[var(--line)] border-y border-[var(--line)]">
@@ -137,6 +159,7 @@ export default async function HavrutaPage({
                   </div>
                 ))}
               </dl>
+              <p className={bodyClass}>집에서 기억할 것은 세 가지입니다. 질문으로 시작하고, 말을 끊지 않고 듣고, 답이 달라도 그 이유를 물어봅니다. 저녁 식탁처럼 자주 마주치는 자리에서 해보세요. 서로 판단받을 걱정 없이 말할 수 있는 순간을 고르고, 아이와도 책이나 뉴스에서 각자 궁금했던 점을 나눠볼 수 있습니다.</p>
 
               <h3 className="mt-8 text-xl font-bold">같은 상황에서 어떤 말을 건넬까요?</h3>
               <div className="mt-4 max-w-3xl divide-y divide-[var(--line)] border-y border-[var(--line)]">
@@ -153,15 +176,41 @@ export default async function HavrutaPage({
                 ))}
               </div>
 
+              <h3 className="mt-8 text-xl font-bold">질문이 이어지는 대화 예시</h3>
+              <dl className="mt-4 max-w-3xl divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                {practiceDialogue.map(([speaker, line]) => (
+                  <div key={line} className="grid gap-1 py-3 text-sm leading-6 sm:grid-cols-[7rem_1fr] sm:gap-4">
+                    <dt className="font-bold text-[#345b48]">{speaker}</dt>
+                    <dd>“{line}”</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className={bodyClass}>한 번 더 묻자, 회의에서 안이 채택되지 않은 일보다 자신의 설명을 들어주는 사람이 없었다는 점이 더 마음에 남았음을 알게 됩니다. 조언은 상대가 원하는지 물은 뒤에 해도 늦지 않습니다.</p>
+
               <h3 id="practice" className="mt-8 scroll-mt-6 text-xl font-bold">오늘 저녁, 10분 실습</h3>
-              <p className={bodyClass}>둘 다 여유가 있는 시간에 휴대폰을 내려놓고, 지금 편하게 답할 수 있는 질문을 하나 고릅니다.</p>
+              <ol className="mt-4 ml-5 max-w-3xl list-decimal space-y-2 leading-7">
+                <li>둘 다 여유가 있을 때 TV를 끄고 휴대폰을 내려놓습니다.</li>
+                <li>지금 편하게 답할 수 있는 질문을 아래에서 하나 고릅니다.</li>
+                <li>한 사람이 묻고 말을 끊지 않고 듣습니다. 다 들으면 이해한 내용을 짧게 확인합니다.</li>
+                <li>5분 뒤 역할을 바꿉니다. 답하기 어려운 질문은 건너뛰어도 됩니다.</li>
+              </ol>
               <ul className="mt-4 ml-5 max-w-3xl list-disc space-y-2 leading-7">
                 <li>오늘 마음이 한결 가벼워진 순간이 있었어?</li>
-                <li>요즘 집에서 혼자 챙기느라 버겁게 느끼는 일이 있어?</li>
-                <li>최근에 내가 한 말 중에 오래 기억에 남은 말이 있어?</li>
+                <li>요즘 혼자 마음에 담아둔 일 중에 오늘 나누고 싶은 게 있어?</li>
+                <li>요즘 내 모습 중에 당신에게 새롭게 보인 게 있어?</li>
               </ul>
-              <p className={bodyClass}>먼저 한 사람이 묻고 5분 동안 듣습니다. 다 들으면 “내가 이렇게 이해했는데 맞아?”라고 확인한 뒤 역할을 바꿉니다. 답하기 어려운 질문은 건너뛰어도 됩니다. 마지막에 오늘 새로 알게 된 점을 한 가지씩 나눠보세요.</p>
-              <a href="https://havruta-seung-a.tistory.com/1" className="mt-4 inline-block text-sm text-[#345b48] underline underline-offset-4">참고 글 · 부부하브루타란 무엇인가</a>
+              <p className={bodyClass}>마지막에 오늘 새로 알게 된 점을 한 가지씩 나눠보세요. 오늘은 질문 하나만 꺼내보고 다음에 이어가도 됩니다.</p>
+
+              <h3 className="mt-8 text-xl font-bold">시작하기 전에 자주 묻는 질문</h3>
+              <dl className="mt-4 max-w-3xl divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                {practiceQuestions.map(([question, answer]) => (
+                  <div key={question} className="py-4">
+                    <dt className="font-bold">{question}</dt>
+                    <dd className="mt-1 text-sm leading-7 text-[var(--ink-soft)]">{answer}</dd>
+                  </div>
+                ))}
+              </dl>
+              <a href="https://havruta-seung-a.tistory.com/1" className="mt-4 inline-block text-sm text-[#345b48] underline underline-offset-4">참고 자료 · 이승아의 부부하브루타 글과 카드 15장</a>
             </section>
           )}
 
@@ -170,6 +219,10 @@ export default async function HavrutaPage({
               <h2 className={headingClass}>효과</h2>
               <p className={bodyClass}>부부하브루타는 상대의 생각을 더 구체적으로 듣고, 의견이 갈릴 때 다시 이야기할 방법을 연습하는 데 도움이 될 수 있습니다.</p>
               <dl className="mt-5 max-w-3xl divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                <div className="py-4">
+                  <dt className="font-bold">내 생각의 이유를 더 깊이 살핍니다</dt>
+                  <dd className="mt-1 text-sm leading-7 text-[var(--ink-soft)]">왜 그렇게 생각하는지 설명해보고, 상대가 주목한 점도 듣습니다. 같은 일에서 내가 놓친 부분을 발견하거나, 처음 떠올린 판단을 다시 생각해볼 수 있습니다.</dd>
+                </div>
                 <div className="py-4">
                   <dt className="font-bold">일정 밖의 이야기도 나눕니다</dt>
                   <dd className="mt-1 text-sm leading-7 text-[var(--ink-soft)]">집안일과 내일 일정을 함께 챙기는 사이이기에, 짧게라도 서로에게 물어볼 기회를 만들 수 있습니다. 요즘 무엇이 힘든지, 어떤 말에 힘을 얻었는지 구체적으로 알아갑니다.</dd>
